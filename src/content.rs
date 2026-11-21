@@ -302,12 +302,23 @@ pub fn install_shader_pack(project_id: &str, root: &Path, _minecraft: &str) -> R
     save_project_file(project_id, root, "shaderpacks", "shader pack", None, None)
 }
 
-fn discover_modpack_dependencies(files: &[PackFile]) -> Result<Vec<VersionDependency>> {
-    let hashes = files.iter()
+fn discover_modpack_dependencies(files: &[PackFile], instance: &Path) -> Result<Vec<VersionDependency>> {
+    let mut hashes = files.iter()
         .filter(|item| item.path.to_ascii_lowercase().ends_with(".jar"))
-        .filter(|item| item.downloads.iter().any(|url| url.contains("cdn.modrinth.com")))
         .filter_map(|item| item.hashes.get("sha1").cloned())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
+    let mods_directory = instance.join("mods");
+    if mods_directory.exists() {
+        for entry in fs::read_dir(&mods_directory)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() { continue; }
+            let path = entry.path();
+            if path.extension().and_then(|value| value.to_str()).is_none_or(|value| !value.eq_ignore_ascii_case("jar")) { continue; }
+            let bytes = fs::read(path)?;
+            hashes.insert(format!("{:x}", Sha1::digest(&bytes)));
+        }
+    }
+    let hashes = hashes.into_iter().collect::<Vec<_>>();
     if hashes.is_empty() { return Ok(Vec::new()); }
     let http = client()?;
     let queue = std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::from(hashes)));
@@ -426,7 +437,7 @@ pub fn install_modpack_bytes(bytes: &[u8], root: &Path) -> Result<String> {
         fs::write(destination, bytes)?;
     }
     let mut dependencies = recovered_dependencies;
-    dependencies.extend(discover_modpack_dependencies(&manifest.files)?);
+    dependencies.extend(discover_modpack_dependencies(&manifest.files, &instance)?);
     if !dependencies.is_empty() {
         let minecraft = manifest.dependencies.get("minecraft").context("Modpack Minecraft version is missing")?;
         let loader = manifest.dependencies.iter()
