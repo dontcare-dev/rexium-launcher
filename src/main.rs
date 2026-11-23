@@ -67,6 +67,7 @@ struct Settings {
     microsoft_client_id: String,
     ram_gb: u32,
     minecraft_version: String,
+    offline_username: String,
 }
 
 enum WorkerMessage {
@@ -98,8 +99,8 @@ impl RexiumApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.window_fill = Color32::from_rgb(8, 12, 11);
-        style.visuals.panel_fill = Color32::from_rgb(10, 15, 13);
+        style.visuals.window_fill = Color32::BLACK;
+        style.visuals.panel_fill = Color32::BLACK;
         style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(26, 34, 29);
         style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(39, 62, 46);
         style.visuals.widgets.active.bg_fill = Color32::from_rgb(46, 92, 58);
@@ -115,8 +116,8 @@ impl RexiumApp {
             status: "Ready".to_owned(),
             busy: false,
             settings,
-            account: None,
-            account_name: None,
+            account: Some(Account::offline("RexiumPlayer")),
+            account_name: Some("RexiumPlayer (offline)".to_owned()),
             background_frames,
             background_started: Instant::now(),
             tx,
@@ -145,6 +146,7 @@ impl RexiumApp {
                 microsoft_client_id: String::new(),
                 ram_gb: 4,
                 minecraft_version: MC_VERSION.to_owned(),
+                offline_username: "RexiumPlayer".to_owned(),
             })
     }
 
@@ -247,11 +249,7 @@ impl RexiumApp {
 
     fn start_game(&mut self) {
         if self.busy { return; }
-        let Some(account) = self.account.clone() else {
-            self.status("Sign in with Microsoft before playing.");
-            self.start_login();
-            return;
-        };
+        let account = self.account.clone().unwrap_or_else(|| Account::offline(&self.settings.offline_username));
         if !self.installed {
             self.start_install();
             return;
@@ -417,24 +415,9 @@ impl RexiumApp {
             ui.vertical(|ui| {
                 ui.label(RichText::new("TENSURA CLIENT").size(12.0).strong().color(self.accent()));
                 ui.label(RichText::new("Enter your world.").size(31.0).strong().color(Color32::WHITE));
-                ui.label(RichText::new("A performance-focused Minecraft profile.").size(13.0).color(Color32::from_gray(170)));
+                ui.label(RichText::new("Fabric performance profile").size(13.0).color(Color32::from_gray(170)));
             });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some((bg, _)) = self.background_frames.get(self.background_index()) {
-                    ui.add(egui::Image::new((bg.id(), Vec2::new(330.0, 155.0))).corner_radius(8.0));
-                } else {
-                    let (rect, _) = ui.allocate_exact_size(Vec2::new(330.0, 155.0), egui::Sense::hover());
-                    let p = ui.painter();
-                    p.rect_filled(rect, 8.0, Color32::from_rgb(22, 36, 28));
-                    p.circle_filled(rect.center() + Vec2::new(70.0, -20.0), 58.0, Color32::from_rgb(36, 102, 67));
-                    p.circle_filled(rect.center() + Vec2::new(70.0, -20.0), 42.0, Color32::from_rgb(76, 178, 118));
-                    p.circle_filled(rect.center() + Vec2::new(56.0, -30.0), 7.0, Color32::WHITE);
-                    p.circle_filled(rect.center() + Vec2::new(83.0, -30.0), 7.0, Color32::WHITE);
-                    p.circle_filled(rect.center() + Vec2::new(56.0, -30.0), 3.0, Color32::BLACK);
-                    p.circle_filled(rect.center() + Vec2::new(83.0, -30.0), 3.0, Color32::BLACK);
-                    p.text(rect.left_bottom() + Vec2::new(14.0, -12.0), egui::Align2::LEFT_BOTTOM, "TENSURA", egui::FontId::proportional(12.0), Color32::WHITE);
-                }
-            });
+
         });
         ui.add_space(18.0);
         egui::Frame::new().fill(Color32::from_rgb(14, 22, 18))
@@ -476,12 +459,12 @@ impl RexiumApp {
             egui::Frame::new().fill(Color32::from_rgb(13, 20, 17)).corner_radius(8.0).inner_margin(14.0).show(&mut columns[1], |ui| {
                 ui.label(RichText::new("ACCOUNT").size(11.0).strong().color(self.accent()));
                 ui.add_space(8.0);
-                ui.label(self.account_name.as_deref().unwrap_or("Microsoft account not connected"));
+                ui.label(self.account_name.as_deref().unwrap_or("Offline mode"));
                 if self.account.is_none() && ui.button("Sign in with Microsoft").clicked() {
                     self.start_login();
                 }
                 ui.add_space(8.0);
-                ui.label(RichText::new("Shaders are managed separately from performance mods.").size(11.0).color(Color32::from_gray(145)));
+                ui.label(RichText::new("Microsoft sign-in is optional.").size(11.0).color(Color32::from_gray(145)));
             });
         });
     }
@@ -535,9 +518,13 @@ impl RexiumApp {
                 ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
             });
             ui.add_space(10.0);
-            ui.label("Microsoft app client ID");
+            ui.label("Offline player name");
+            ui.text_edit_singleline(&mut self.settings.offline_username);
+            ui.label(RichText::new("Offline mode works without a Microsoft account. Online servers may require a paid Microsoft-owned Java account.").size(10.0).color(Color32::from_gray(145)));
+            ui.add_space(10.0);
+            ui.label("Microsoft app client ID (optional)");
             ui.text_edit_singleline(&mut self.settings.microsoft_client_id);
-            ui.label(RichText::new("Required for Microsoft sign-in. Tokens are kept in memory for this session.").size(10.0).color(Color32::from_gray(145)));
+            ui.label(RichText::new("Only needed if you choose Microsoft sign-in.").size(10.0).color(Color32::from_gray(145)));
             ui.add_space(10.0);
             if ui.button("Choose background image").clicked() {
                 if let Some(path) = rfd::FileDialog::new().add_filter("Images and GIFs", &["png", "jpg", "jpeg", "webp", "gif"]).pick_file() {
@@ -580,7 +567,12 @@ impl eframe::App for RexiumApp {
                 });
             });
         });
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::from_rgb(10, 15, 13)).inner_margin(22.0)).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::BLACK).inner_margin(22.0)).show(ctx, |ui| {
+            let rect = ui.max_rect();
+            if let Some((background, _)) = self.background_frames.get(self.background_index()) {
+                ui.painter().image(background.id(), rect, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::Pos2::new(1.0, 1.0)), Color32::from_white_alpha(185));
+                ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(105));
+            }
             match self.page {
                 Page::Home => self.home(ui),
                 Page::Mods | Page::ResourcePacks | Page::Shaderpacks => self.browser(ui),
