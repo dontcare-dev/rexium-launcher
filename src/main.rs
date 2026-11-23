@@ -412,7 +412,7 @@ impl eframe::App for RexiumApp {
             .show(ctx, |ui| {
                 match self.page {
                     Page::Home => {
-                        self.header(ui, "Your Minecraft, organized.", "A simple home for your mods, packs, and game setup.");
+                        self.header(ui, "Rexium Launcher", "Rexium Launcher is a Minecraft launcher built in Rust.");
                         egui::Frame::new()
                             .fill(Color32::from_rgba_unmultiplied(28, 30, 45, 225))
                             .stroke(egui::Stroke::new(1.0, Color32::from_gray(48)))
@@ -423,7 +423,6 @@ impl eframe::App for RexiumApp {
                                 ui.add_space(8.0);
                                 ui.label(RichText::new("Everything you need.\nNothing in your way.").size(29.0).strong().color(Color32::WHITE));
                                 ui.add_space(8.0);
-                                ui.label(RichText::new("Browse Modrinth and install content directly into your Minecraft folders.").size(13.0).color(Color32::from_gray(165)));
                                 ui.add_space(18.0);
                                 ui.horizontal(|ui| {
                                     if ui.add(egui::Button::new("Browse mods").fill(self.accent()).min_size(Vec2::new(130.0, 40.0))).clicked() {
