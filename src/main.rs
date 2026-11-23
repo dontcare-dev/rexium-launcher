@@ -115,7 +115,8 @@ impl RexiumApp {
         }
         let query = self.query.trim();
         let encoded_query = urlencoding::encode(query);
-        let facets = urlencoding::encode(&format!("[[\"project_type:{}\"]]", kind));
+        let facet_query = format!("[[\"project_type:{}\"]]", kind);
+        let facets = urlencoding::encode(&facet_query);
         let url = format!(
             "https://api.modrinth.com/v2/search?query={}&facets={}&limit=30&index=relevance",
             encoded_query, facets
@@ -344,7 +345,7 @@ impl RexiumApp {
                 for project in self.results.clone() {
                     egui::Frame::new()
                         .fill(Color32::from_rgba_unmultiplied(24, 26, 37, 225))
-                        .stroke(egui::Stroke::new(1.0, Color32::from_gray(42)))
+                        .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(42)))
                         .corner_radius(12.0)
                         .inner_margin(14.0)
                         .show(ui, |ui| {
