@@ -311,24 +311,32 @@ impl RexiumApp {
 
     fn handle_messages(&mut self) {
         while let Ok(message) = self.rx.try_recv() {
-            self.busy = false;
             match message {
                 WorkerMessage::Status(text) => self.status(text),
                 WorkerMessage::Installed(text) => {
+                    self.busy = false;
                     self.installed = true;
                     self.status(text);
                 }
                 WorkerMessage::LoggedIn { name, uuid, token } => {
+                    self.busy = false;
                     self.account = Some(Account::Microsoft { username: name.clone(), uuid, access_token: token });
                     self.account_name = Some(name.clone());
                     self.status(format!("Signed in as {}", name));
                 }
                 WorkerMessage::SearchResults(results) => {
+                    self.busy = false;
                     self.results = results;
                     self.status(format!("{} results", self.results.len()));
                 }
-                WorkerMessage::Error(error) => self.status(error),
-                WorkerMessage::Launched => self.status("Minecraft started."),
+                WorkerMessage::Error(error) => {
+                    self.busy = false;
+                    self.status(error);
+                }
+                WorkerMessage::Launched => {
+                    self.busy = false;
+                    self.status("Minecraft started.");
+                }
             }
         }
     }
