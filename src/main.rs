@@ -67,8 +67,11 @@ struct Settings {
     microsoft_client_id: String,
     ram_gb: u32,
     minecraft_version: String,
+    #[serde(default = "default_offline_username")]
     offline_username: String,
 }
+
+fn default_offline_username() -> String { "RexiumPlayer".to_owned() }
 
 enum WorkerMessage {
     Status(String),
@@ -460,7 +463,7 @@ impl RexiumApp {
                 ui.label(RichText::new("ACCOUNT").size(11.0).strong().color(self.accent()));
                 ui.add_space(8.0);
                 ui.label(self.account_name.as_deref().unwrap_or("Offline mode"));
-                if self.account.is_none() && ui.button("Sign in with Microsoft").clicked() {
+                if ui.button("Sign in with Microsoft (optional)").clicked() {
                     self.start_login();
                 }
                 ui.add_space(8.0);
@@ -540,6 +543,14 @@ impl RexiumApp {
             ui.label("Accent");
             ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
             if ui.button("Save settings").clicked() {
+                let username = self.settings.offline_username.trim();
+                if !username.is_empty() {
+                    self.settings.offline_username = username.chars().take(16).collect();
+                    if self.account_name.as_deref().is_some_and(|name| name.ends_with("(offline)")) {
+                        self.account = Some(Account::offline(&self.settings.offline_username));
+                        self.account_name = Some(format!("{} (offline)", self.settings.offline_username));
+                    }
+                }
                 self.save_settings();
                 self.status("Settings saved.");
             }
@@ -675,9 +686,10 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Re
             Err(_) => skipped.push(*slug),
         }
     }
-    let _ = download_modrinth_project("complementary-reimagined", "shader", version, &RexiumApp::game_dir());
-    let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. Profile: {}",
-        install.version_id, installed.len(), skipped.len(), version, RexiumApp::instance_dir().display());
+    let shader = download_modrinth_project("complementary-reimagined", "shader", version, &RexiumApp::game_dir());
+    let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
+    let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
+        install.version_id, installed.len(), skipped.len(), version, shader_status, RexiumApp::instance_dir().display());
     Ok(report)
 }
 
