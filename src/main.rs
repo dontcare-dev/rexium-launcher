@@ -166,7 +166,7 @@ impl RexiumApp {
             let Ok(frames) = image::AnimationDecoder::into_frames(decoder).collect_frames() else { return Vec::new(); };
             frames.into_iter().map(|frame| {
                 let delay = frame.delay().numer_denom_ms();
-                let ms = if delay.1 == 0 { 100 } else { (delay.0 / delay.1).max(30) };
+                let ms = delay.0.checked_div(delay.1).unwrap_or(100).max(30);
                 (frame.into_buffer(), Duration::from_millis(ms as u64))
             }).collect()
         } else {
@@ -665,7 +665,7 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Re
     Ok(report)
 }
 
-fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &PathBuf) -> std::result::Result<PathBuf, String> {
+fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &Path) -> std::result::Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
         .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
     let mut request = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
