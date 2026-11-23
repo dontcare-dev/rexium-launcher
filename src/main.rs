@@ -3,7 +3,7 @@ use egui::{Color32, RichText, Vec2};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const LOGO_URL: &str = "https://i.ibb.co/fz6RJNkH/8da0faf8b5a4ac0b1d18647577e404b8.jpg";
 
@@ -59,7 +59,6 @@ struct RexiumApp {
     accent_hue: f32,
     animated_background: bool,
     logo: Option<egui::TextureHandle>,
-    last_search: Option<Instant>,
 }
 
 impl RexiumApp {
@@ -82,7 +81,6 @@ impl RexiumApp {
             accent_hue: 0.68,
             animated_background: true,
             logo,
-            last_search: None,
         }
     }
 
@@ -134,7 +132,6 @@ impl RexiumApp {
             Ok(response) => {
                 self.results = response.hits;
                 self.status = format!("{} results", self.results.len());
-                self.last_search = Some(Instant::now());
             }
             Err(error) => {
                 self.results.clear();
