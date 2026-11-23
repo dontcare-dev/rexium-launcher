@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+<radialGradient id="glow"><stop stop-color="#6d5dfc" stop-opacity=".22"/><stop offset="1" stop-color="#090a10" stop-opacity="0"/></radialGradient>
+<linearGradient id="line" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9c8cff" stop-opacity=".22"/><stop offset="1" stop-color="#55d6be" stop-opacity=".02"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="#090a10"/>
+<circle cx="1280" cy="120" r="560" fill="url(#glow)"/>
+<circle cx="180" cy="850" r="520" fill="url(#glow)"/>
+<g fill="none" stroke="url(#line)" stroke-width="1.5">
+<path d="M0 690 Q380 500 720 700 T1600 570"/>
+<path d="M0 740 Q380 550 720 750 T1600 620"/>
+<path d="M0 790 Q380 600 720 800 T1600 670"/>
+</g>
+<g fill="#a99bff" opacity=".22">
+<circle cx="1180" cy="250" r="5"><animate attributeName="cy" values="250;220;250" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="1370" cy="460" r="3"><animate attributeName="cy" values="460;430;460" dur="6s" repeatCount="indefinite"/></circle>
+<circle cx="360" cy="650" r="4"><animate attributeName="cy" values="650;620;650" dur="7s" repeatCount="indefinite"/></circle>
+</g>
+</svg>
