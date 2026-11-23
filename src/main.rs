@@ -2,8 +2,9 @@ use eframe::egui;
 use egui::{Color32, RichText, Vec2};
 use serde::Deserialize;
 use std::fs;
+use std::io::BufReader;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const LOGO_URL: &str = "https://i.ibb.co/fz6RJNkH/8da0faf8b5a4ac0b1d18647577e404b8.jpg";
 
@@ -57,7 +58,9 @@ struct RexiumApp {
     results: Vec<Project>,
     status: String,
     accent_hue: f32,
-    animated_background: bool,
+    background_frames: Vec<(egui::TextureHandle, Duration)>,
+    background_started: Instant,
+    background_path: String,
     logo: Option<egui::TextureHandle>,
 }
 
@@ -65,11 +68,11 @@ impl RexiumApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.window_fill = Color32::from_rgb(12, 13, 20);
-        style.visuals.panel_fill = Color32::from_rgb(12, 13, 20);
-        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(27, 29, 41);
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(43, 45, 62);
-        style.visuals.widgets.active.bg_fill = Color32::from_rgb(57, 59, 82);
+        style.visuals.window_fill = Color32::from_rgb(12, 17, 14);
+        style.visuals.panel_fill = Color32::from_rgb(12, 17, 14);
+        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(25, 37, 29);
+        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(37, 58, 43);
+        style.visuals.widgets.active.bg_fill = Color32::from_rgb(48, 78, 55);
         style.spacing.item_spacing = Vec2::new(12.0, 12.0);
         cc.egui_ctx.set_style(style);
         let logo = Self::load_logo(&cc.egui_ctx);
@@ -78,8 +81,10 @@ impl RexiumApp {
             query: String::new(),
             results: Vec::new(),
             status: "Ready".to_owned(),
-            accent_hue: 0.68,
-            animated_background: true,
+            accent_hue: 0.36,
+            background_frames: Vec::new(),
+            background_started: Instant::now(),
+            background_path: String::new(),
             logo,
         }
     }
@@ -243,36 +248,72 @@ impl RexiumApp {
         }
     }
 
+    fn load_custom_background(&mut self, ctx: &egui::Context, path: PathBuf) -> Result<(), String> {
+        let is_gif = path.extension().and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
+        let mut decoded = Vec::new();
+        if is_gif {
+            let file = std::fs::File::open(&path).map_err(|error| error.to_string())?;
+            let decoder = image::codecs::gif::GifDecoder::new(BufReader::new(file))
+                .map_err(|error| error.to_string())?;
+            let frames = image::AnimationDecoder::into_frames(decoder)
+                .collect_frames().map_err(|error| error.to_string())?;
+            for frame in frames {
+                decoded.push((frame.into_buffer(), Duration::from_millis(100)));
+            }
+        } else {
+            let image = image::open(&path).map_err(|error| error.to_string())?.to_rgba8();
+            decoded.push((image, Duration::from_secs(1)));
+        }
+        if decoded.is_empty() {
+            return Err("The selected image contains no frames.".to_owned());
+        }
+        self.background_frames = decoded.into_iter().enumerate().map(|(index, (image, delay))| {
+            let size = [image.width() as usize, image.height() as usize];
+            let pixels = image.into_raw();
+            let texture = ctx.load_texture(
+                format!("rexium-custom-background-{index}"),
+                egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
+                egui::TextureOptions::LINEAR,
+            );
+            (texture, delay)
+        }).collect();
+        self.background_started = Instant::now();
+        self.background_path = path.display().to_string();
+        Ok(())
+    }
+
     fn background(&self, ctx: &egui::Context) {
         let rect = ctx.screen_rect();
         let painter = ctx.layer_painter(egui::LayerId::background());
-        painter.rect_filled(rect, 0.0, Color32::from_rgb(9, 10, 16));
-        let time = ctx.input(|input| input.time) as f32;
-        let accent = self.accent();
-        let glow = Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 18);
-        painter.circle_filled(
-            egui::pos2(rect.right() - 80.0, rect.top() + 90.0),
-            320.0,
-            glow,
-        );
-        painter.circle_filled(
-            egui::pos2(rect.left() + 40.0, rect.bottom() + 60.0),
-            260.0,
-            Color32::from_rgba_unmultiplied(62, 186, 176, 10),
-        );
-        if self.animated_background {
-            for i in 0..18 {
-                let phase = time * (0.24 + (i % 4) as f32 * 0.06) + i as f32 * 1.71;
-                let x = rect.left() + (i as f32 * 97.0) % rect.width().max(1.0);
-                let y = rect.top() + ((i as f32 * 53.0 + phase.sin() * 34.0 + time * 7.0) % rect.height().max(1.0));
-                let radius = 1.5 + (i % 3) as f32;
-                painter.circle_filled(
-                    egui::pos2(x, y),
-                    radius,
-                    Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 75),
-                );
+        painter.rect_filled(rect, 0.0, Color32::from_rgb(11, 16, 12));
+        if self.background_frames.is_empty() {
+            return;
+        }
+        let total: u128 = self.background_frames.iter().map(|(_, delay)| delay.as_millis()).sum();
+        let elapsed = if total > 0 {
+            self.background_started.elapsed().as_millis() % total
+        } else {
+            0
+        };
+        let mut position = 0_u128;
+        let mut selected = 0;
+        for (index, (_, delay)) in self.background_frames.iter().enumerate() {
+            position += delay.as_millis();
+            if elapsed < position {
+                selected = index;
+                break;
             }
-            ctx.request_repaint_after(Duration::from_millis(32));
+        }
+        let texture = &self.background_frames[selected].0;
+        painter.image(
+            texture.id(),
+            rect,
+            egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
+        if self.background_frames.len() > 1 {
+            ctx.request_repaint_after(self.background_frames[selected].1);
         }
     }
 
@@ -301,14 +342,9 @@ impl RexiumApp {
     }
 
     fn header(&self, ui: &mut egui::Ui, title: &str, subtitle: &str) {
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.label(RichText::new(title).size(27.0).strong().color(Color32::WHITE));
-                ui.label(RichText::new(subtitle).size(13.0).color(Color32::from_rgb(145, 150, 170)));
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(RichText::new("REXIUM").size(12.0).strong().color(self.accent()));
-            });
+        ui.vertical(|ui| {
+            ui.label(RichText::new(title).size(27.0).strong().color(Color32::WHITE));
+            ui.label(RichText::new(subtitle).size(13.0).color(Color32::from_rgb(145, 160, 145)));
         });
         ui.add_space(18.0);
     }
@@ -401,10 +437,6 @@ impl eframe::App for RexiumApp {
                 ui.label(RichText::new("PREFERENCES").size(10.0).strong().color(Color32::from_gray(112)));
                 ui.add_space(8.0);
                 self.nav_button(ui, Page::Settings);
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                    ui.label(RichText::new("Rexium Launcher  ·  0.1.0").size(10.0).color(Color32::from_gray(100)));
-                    ui.label(RichText::new(&self.status).size(10.0).color(self.accent()));
-                });
             });
 
         egui::CentralPanel::default()
@@ -473,8 +505,27 @@ impl eframe::App for RexiumApp {
                                     ui.colored_label(self.accent(), "Rexium accent");
                                 });
                                 ui.add_space(16.0);
-                                ui.checkbox(&mut self.animated_background, "Animated floating background");
-                                ui.label(RichText::new("Background artwork is built from lightweight SVG-style vector shapes.")
+                                ui.label("Background image or GIF");
+                                ui.horizontal(|ui| {
+                                    if ui.button("Choose file").clicked() {
+                                        if let Some(path) = rfd::FileDialog::new()
+                                            .add_filter("Images and GIFs", &["png", "jpg", "jpeg", "webp", "gif"])
+                                            .pick_file()
+                                        {
+                                            if let Err(error) = self.load_custom_background(ctx, path) {
+                                                self.status = error;
+                                            }
+                                        }
+                                    }
+                                    if ui.button("Remove background").clicked() {
+                                        self.background_frames.clear();
+                                        self.background_path.clear();
+                                    }
+                                });
+                                if !self.background_path.is_empty() {
+                                    ui.label(RichText::new(&self.background_path).size(11.0).color(Color32::from_gray(145)));
+                                }
+                                ui.label(RichText::new("PNG, JPG, WEBP and animated GIF supported.")
                                     .size(11.0).color(Color32::from_gray(135)));
                             });
                         ui.add_space(14.0);
@@ -490,17 +541,7 @@ impl eframe::App for RexiumApp {
                 }
             });
 
-        egui::TopBottomPanel::bottom("rexium_status")
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(11, 12, 18, 240)).inner_margin(egui::Margin::symmetric(20, 8)))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("●").color(self.accent()).size(10.0));
-                    ui.label(RichText::new(&self.status).size(11.0).color(Color32::from_gray(150)));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(RichText::new("MODRINTH").size(10.0).strong().color(Color32::from_gray(110)));
-                    });
-                });
-            });
+
     }
 }
 
