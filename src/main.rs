@@ -646,7 +646,7 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
     Err("Install Java 21 or newer and make java available on PATH.".to_owned())
 }
 
-fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, String> {
+fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
     fs::create_dir_all(RexiumApp::game_dir()).map_err(|e| e.to_string())?;
     for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
         fs::create_dir_all(RexiumApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
@@ -673,7 +673,7 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, 
     Ok(report)
 }
 
-fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &PathBuf) -> Result<PathBuf, String> {
+fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &PathBuf) -> std::result::Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
         .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
     let mut request = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
@@ -703,7 +703,7 @@ fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir:
     Ok(destination)
 }
 
-fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> Result<(String, String, String), String> {
+fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<(String, String, String), String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30))
         .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
     let device: serde_json::Value = client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
