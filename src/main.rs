@@ -213,7 +213,7 @@ impl RexiumApp {
         };
         let filename = file.get("filename").and_then(|value| value.as_str())
             .unwrap_or("download")
-            .replace(['/', '\\'], "_");
+            .replace('/', "_").replace('\\', "_");
         let target_dir = match kind {
             "mod" => Self::minecraft_dir().join("mods"),
             "resourcepack" => Self::minecraft_dir().join("resourcepacks"),
@@ -383,7 +383,7 @@ impl eframe::App for RexiumApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if let Some(logo) = &self.logo {
-                        ui.add(egui::Image::new(logo).fit_to_exact_size(Vec2::splat(42.0)));
+                        ui.add(egui::Image::new((logo.id(), Vec2::splat(42.0))));
                     } else {
                         ui.label(RichText::new("R").size(31.0).strong().color(self.accent()));
                     }
