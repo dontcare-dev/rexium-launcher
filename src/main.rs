@@ -127,6 +127,7 @@ impl RexiumApp {
             search_kind: String::new(),
         };
         app.installed = app.profile_exists();
+        if !app.installed { app.start_install(); }
         app
     }
 
@@ -173,13 +174,7 @@ impl RexiumApp {
     }
 
     fn profile_exists(&self) -> bool {
-        let version = Self::minecraft_dir().join("versions")
-            .join(format!("fabric-loader-{}-{}", self.settings.minecraft_version, "0"));
-        let versions = Self::minecraft_dir().join("versions");
-        versions.exists() && fs::read_dir(versions).ok().is_some_and(|entries| {
-            entries.flatten().any(|entry| entry.file_name().to_string_lossy()
-                .starts_with(&format!("fabric-loader-{}-", self.settings.minecraft_version)))
-        }) || version.exists()
+        find_fabric_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version).is_some()
     }
 
     fn status(&mut self, text: impl Into<String>) {
@@ -246,10 +241,10 @@ impl RexiumApp {
         };
         let ram = self.settings.ram_gb.clamp(2, 16);
         thread::spawn(move || {
-            let result = (|| -> Result<(), String> {
+            let result = (|| -> std::result::Result<(), String> {
                 let launcher = Launcher::new(RexiumApp::minecraft_dir());
                 let version = launcher.load_version(&version_id).map_err(|e| e.to_string())?;
-                let java = find_java().ok_or_else(|| "Java runtime not found. Install Java 21 or use the Java runtime setting.".to_owned())?;
+                let java = ensure_java()?;
                 let options = LaunchOptions {
                     account,
                     java_executable: Some(java),
@@ -260,9 +255,8 @@ impl RexiumApp {
                 };
                 let launch = launcher.build_launch_command_from_version(&version, options).map_err(|e| e.to_string())?;
                 let mut command = Command::new(&launch.executable);
-                command.args(&launch.args).current_dir(&launch.working_dir).envs(launch.env);
-                command.arg(format!("-Xms1G"));
-                command.arg(format!("-Xmx{}G", ram));
+                command.arg("-Xms1G").arg(format!("-Xmx{}G", ram))
+                    .args(&launch.args).current_dir(&launch.working_dir).envs(launch.env);
                 command.spawn().map_err(|e| format!("Minecraft could not start: {e}"))?;
                 Ok(())
             })();
@@ -564,7 +558,7 @@ fn find_fabric_version_id(root: &PathBuf, mc_version: &str) -> Option<String> {
     let entries = fs::read_dir(root.join("versions")).ok()?;
     entries.flatten().find_map(|entry| {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with(&format!("fabric-loader-{}-", mc_version)) { Some(name) } else { None }
+        if name.starts_with("fabric-loader-") && name.ends_with(&format!("-{}", mc_version)) { Some(name) } else { None }
     })
 }
 
@@ -575,12 +569,37 @@ fn find_java() -> Option<PathBuf> {
         let candidates = [
             PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\javaw.exe"),
             PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\javaw.exe"),
-            PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jre-21\bin\javaw.exe"),
+            RexiumApp::data_dir().join("runtime").join("bin").join("javaw.exe"),
         ];
         return candidates.into_iter().find(|p| p.exists());
     }
     #[allow(unreachable_code)]
     None
+}
+
+fn ensure_java() -> std::result::Result<PathBuf, String> {
+    if let Some(java) = find_java() { return Ok(java); }
+    #[cfg(target_os = "windows")]
+    {
+        let runtime_dir = RexiumApp::data_dir().join("runtime");
+        fs::create_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
+        let bytes = reqwest::blocking::get("https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse")
+            .map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
+            .bytes().map_err(|e| e.to_string())?;
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| e.to_string())?;
+        archive.extract(&runtime_dir).map_err(|e| e.to_string())?;
+        fn locate(dir: &std::path::Path) -> Option<PathBuf> {
+            for entry in fs::read_dir(dir).ok()?.flatten() {
+                let path = entry.path();
+                if path.file_name().is_some_and(|n| n == "javaw.exe") { return Some(path); }
+                if path.is_dir() { if let Some(found) = locate(&path) { return Some(found); } }
+            }
+            None
+        }
+        return locate(&runtime_dir).ok_or_else(|| "Java runtime installation did not produce javaw.exe.".to_owned());
+    }
+    #[cfg(not(target_os = "windows"))]
+    Err("Install Java 21 or newer and make java available on PATH.".to_owned())
 }
 
 fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, String> {
@@ -604,6 +623,7 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, 
             Err(_) => skipped.push(*slug),
         }
     }
+    let _ = download_modrinth_project("complementary-reimagined", "shader", version, &RexiumApp::game_dir());
     let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. Profile: {}",
         install.version_id, installed.len(), skipped.len(), version, RexiumApp::instance_dir().display());
     Ok(report)
@@ -612,9 +632,10 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, 
 fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &PathBuf) -> Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
         .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
-    let versions: Vec<serde_json::Value> = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
-        .query(&[("game_versions", format!("[\"{}\"]", mc_version)), ("loaders", "[\"fabric\"]".to_owned())])
-        .send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
+    let mut request = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
+        .query(&[("game_versions", format!("[\"{}\"]", mc_version))]);
+    if kind == "mod" { request = request.query(&[("loaders", "[\"fabric\"]")]); }
+    let versions: Vec<serde_json::Value> = request.send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
         .json().map_err(|e| e.to_string())?;
     let file = versions.iter().find_map(|v| {
         v.get("files")?.as_array()?.iter()
