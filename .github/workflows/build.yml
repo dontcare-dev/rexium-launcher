@@ -17,6 +17,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install Linux libraries
         run: sudo apt-get update && sudo apt-get install -y libwayland-dev libxkbcommon-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+      - run: cargo fmt --all
       - run: cargo fmt --all -- --check
       - run: cargo check --release
       - run: cargo clippy --release -- -D warnings
