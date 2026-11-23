@@ -1,39 +1,50 @@
 use eframe::egui;
 use egui::{Color32, RichText, Vec2};
-use serde::Deserialize;
+use mc_launcher_core::prelude::*;
+use mc_launcher_core::{account::Account, auth::microsoft_account};
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::BufReader;
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
 use std::time::{Duration, Instant};
 
-const LOGO_URL: &str = "https://i.ibb.co/fz6RJNkH/8da0faf8b5a4ac0b1d18647577e404b8.jpg";
+const MC_VERSION: &str = "1.21.1";
+const FABRIC_PROFILE: &str = "fabric-loader";
+const PERF_MODS: &[&str] = &[
+    "fabric-api", "sodium", "lithium", "ferrite-core", "immediatelyfast",
+    "entityculling", "modernfix", "iris", "dynamic-fps", "moreculling", "noisium",
+];
 
 #[derive(Clone, Copy, PartialEq)]
-enum Page {
-    Home,
-    Mods,
-    Modpacks,
-    ResourcePacks,
-    Settings,
-}
+enum Page { Home, Mods, ResourcePacks, Shaderpacks, Settings }
 
 impl Page {
     fn label(self) -> &'static str {
         match self {
-            Self::Home => "Overview",
-            Self::Mods => "Mods",
-            Self::Modpacks => "Modpacks",
-            Self::ResourcePacks => "Resource packs",
-            Self::Settings => "Settings",
+            Self::Home => "PLAY",
+            Self::Mods => "MODS",
+            Self::ResourcePacks => "RESOURCE PACKS",
+            Self::Shaderpacks => "SHADERS",
+            Self::Settings => "SETTINGS",
         }
     }
-
     fn project_type(self) -> &'static str {
         match self {
             Self::Mods => "mod",
-            Self::Modpacks => "modpack",
             Self::ResourcePacks => "resourcepack",
+            Self::Shaderpacks => "shader",
             _ => "",
+        }
+    }
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Home => "▶",
+            Self::Mods => "▦",
+            Self::ResourcePacks => "▧",
+            Self::Shaderpacks => "◈",
+            Self::Settings => "⚙",
         }
     }
 }
@@ -48,8 +59,24 @@ struct Project {
 }
 
 #[derive(Deserialize)]
-struct SearchResponse {
-    hits: Vec<Project>,
+struct SearchResponse { hits: Vec<Project> }
+
+#[derive(Default, Serialize, Deserialize)]
+struct Settings {
+    accent_hue: f32,
+    background_path: String,
+    microsoft_client_id: String,
+    ram_gb: u32,
+    minecraft_version: String,
+}
+
+enum WorkerMessage {
+    Status(String),
+    Installed(String),
+    LoggedIn { name: String, uuid: String, token: String },
+    SearchResults(Vec<Project>),
+    Error(String),
+    Launched,
 }
 
 struct RexiumApp {
@@ -57,519 +84,611 @@ struct RexiumApp {
     query: String,
     results: Vec<Project>,
     status: String,
-    accent_hue: f32,
-    background_frames: Vec<(egui::TextureHandle, Duration)>,
-    background_started: Instant,
-    background_path: String,
-    logo: Option<egui::TextureHandle>,
+    busy: bool,
+    settings: Settings,
+    account: Option<Account>,
+    account_name: Option<String>,
+    background: Option<egui::TextureHandle>,
+    tx: Sender<WorkerMessage>,
+    rx: Receiver<WorkerMessage>,
+    last_status: Instant,
+    installed: bool,
+    search_kind: String,
 }
 
 impl RexiumApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.window_fill = Color32::from_rgb(12, 17, 14);
-        style.visuals.panel_fill = Color32::from_rgb(12, 17, 14);
-        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(25, 37, 29);
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(37, 58, 43);
-        style.visuals.widgets.active.bg_fill = Color32::from_rgb(48, 78, 55);
-        style.spacing.item_spacing = Vec2::new(12.0, 12.0);
+        style.visuals.window_fill = Color32::from_rgb(8, 12, 11);
+        style.visuals.panel_fill = Color32::from_rgb(10, 15, 13);
+        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(26, 34, 29);
+        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(39, 62, 46);
+        style.visuals.widgets.active.bg_fill = Color32::from_rgb(46, 92, 58);
+        style.spacing.item_spacing = Vec2::new(10.0, 10.0);
         cc.egui_ctx.set_style(style);
-        let logo = Self::load_logo(&cc.egui_ctx);
-        Self {
+        let settings = Self::load_settings();
+        let background = Self::load_background(&cc.egui_ctx, &settings.background_path);
+        let (tx, rx) = mpsc::channel();
+        let mut app = Self {
             page: Page::Home,
             query: String::new(),
             results: Vec::new(),
             status: "Ready".to_owned(),
-            accent_hue: 0.36,
-            background_frames: Vec::new(),
-            background_started: Instant::now(),
-            background_path: String::new(),
-            logo,
+            busy: false,
+            settings,
+            account: None,
+            account_name: None,
+            background,
+            tx,
+            rx,
+            last_status: Instant::now(),
+            installed: false,
+            search_kind: String::new(),
+        };
+        app.installed = app.profile_exists();
+        app
+    }
+
+    fn data_dir() -> PathBuf {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("RexiumLauncher")
+    }
+    fn instance_dir() -> PathBuf { Self::data_dir().join("instances").join("Tensura Client") }
+    fn game_dir() -> PathBuf { Self::instance_dir().join("game") }
+    fn minecraft_dir() -> PathBuf { Self::instance_dir().join("minecraft") }
+    fn settings_path() -> PathBuf { Self::data_dir().join("settings.json") }
+
+    fn load_settings() -> Settings {
+        fs::read(Self::settings_path()).ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_else(|| Settings {
+                accent_hue: 0.36,
+                background_path: String::new(),
+                microsoft_client_id: String::new(),
+                ram_gb: 4,
+                minecraft_version: MC_VERSION.to_owned(),
+            })
+    }
+
+    fn save_settings(&self) {
+        let _ = fs::create_dir_all(Self::data_dir());
+        if let Ok(bytes) = serde_json::to_vec_pretty(&self.settings) {
+            let _ = fs::write(Self::settings_path(), bytes);
         }
     }
 
-    fn load_logo(ctx: &egui::Context) -> Option<egui::TextureHandle> {
-        let bytes = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(8))
-            .build()
-            .ok()?
-            .get(LOGO_URL)
-            .send()
-            .ok()?
-            .bytes()
-            .ok()?;
-        let image = image::load_from_memory(&bytes).ok()?.to_rgba8();
+    fn load_background(ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
+        if path.is_empty() { return None; }
+        let image = image::open(path).ok()?.to_rgba8();
         let size = [image.width() as usize, image.height() as usize];
-        let pixels = image.into_raw();
         Some(ctx.load_texture(
-            "rexium-client-logo",
-            egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
+            "rexium-user-background",
+            egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()),
             egui::TextureOptions::LINEAR,
         ))
     }
 
     fn accent(&self) -> Color32 {
-        Color32::from(egui::ecolor::Hsva::new(self.accent_hue, 0.66, 0.98, 1.0))
+        Color32::from(egui::ecolor::Hsva::new(self.settings.accent_hue, 0.72, 0.92, 1.0))
+    }
+
+    fn profile_exists(&self) -> bool {
+        let version = Self::minecraft_dir().join("versions")
+            .join(format!("fabric-loader-{}-{}", self.settings.minecraft_version, "0"));
+        let versions = Self::minecraft_dir().join("versions");
+        versions.exists() && fs::read_dir(versions).ok().is_some_and(|entries| {
+            entries.flatten().any(|entry| entry.file_name().to_string_lossy()
+                .starts_with(&format!("fabric-loader-{}-", self.settings.minecraft_version)))
+        }) || version.exists()
+    }
+
+    fn status(&mut self, text: impl Into<String>) {
+        self.status = text.into();
+        self.last_status = Instant::now();
+    }
+
+    fn start_install(&mut self) {
+        if self.busy { return; }
+        self.busy = true;
+        self.status("Installing Tensura Client...");
+        let tx = self.tx.clone();
+        let version = self.settings.minecraft_version.clone();
+        thread::spawn(move || {
+            let result = install_tensura(&version, &tx);
+            match result {
+                Ok(message) => { let _ = tx.send(WorkerMessage::Installed(message)); }
+                Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
+            }
+        });
+    }
+
+    fn start_login(&mut self) {
+        if self.busy { return; }
+        let client_id = self.settings.microsoft_client_id.trim().to_owned();
+        if client_id.is_empty() {
+            self.status("Add your Microsoft app client ID in Settings to enable sign-in.");
+            self.page = Page::Settings;
+            return;
+        }
+        self.busy = true;
+        self.status("Starting Microsoft sign-in...");
+        let tx = self.tx.clone();
+        thread::spawn(move || {
+            match microsoft_device_login(&client_id, &tx) {
+                Ok((name, uuid, token)) => {
+                    let _ = tx.send(WorkerMessage::LoggedIn { name, uuid, token });
+                }
+                Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
+            }
+        });
+    }
+
+    fn start_game(&mut self) {
+        if self.busy { return; }
+        let Some(account) = self.account.clone() else {
+            self.status("Sign in with Microsoft before playing.");
+            self.start_login();
+            return;
+        };
+        if !self.installed {
+            self.start_install();
+            return;
+        }
+        self.busy = true;
+        self.status("Starting Minecraft...");
+        let tx = self.tx.clone();
+        let version_id = find_fabric_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version);
+        let Some(version_id) = version_id else {
+            self.busy = false;
+            self.installed = false;
+            self.status("Tensura Client needs to be installed.");
+            return;
+        };
+        let ram = self.settings.ram_gb.clamp(2, 16);
+        thread::spawn(move || {
+            let result = (|| -> Result<(), String> {
+                let launcher = Launcher::new(RexiumApp::minecraft_dir());
+                let version = launcher.load_version(&version_id).map_err(|e| e.to_string())?;
+                let java = find_java().ok_or_else(|| "Java runtime not found. Install Java 21 or use the Java runtime setting.".to_owned())?;
+                let options = LaunchOptions {
+                    account,
+                    java_executable: Some(java),
+                    game_directory: Some(RexiumApp::game_dir()),
+                    launcher_name: "Rexium".to_owned(),
+                    launcher_version: env!("CARGO_PKG_VERSION").to_owned(),
+                    ..Default::default()
+                };
+                let launch = launcher.build_launch_command_from_version(&version, options).map_err(|e| e.to_string())?;
+                let mut command = Command::new(&launch.executable);
+                command.args(&launch.args).current_dir(&launch.working_dir).envs(launch.env);
+                command.arg(format!("-Xms1G"));
+                command.arg(format!("-Xmx{}G", ram));
+                command.spawn().map_err(|e| format!("Minecraft could not start: {e}"))?;
+                Ok(())
+            })();
+            match result {
+                Ok(()) => { let _ = tx.send(WorkerMessage::Launched); }
+                Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
+            }
+        });
     }
 
     fn search(&mut self) {
-        let kind = self.page.project_type();
-        if kind.is_empty() {
-            return;
-        }
-        let query = self.query.trim();
-        let encoded_query = urlencoding::encode(query);
-        let facet_query = format!("[[\"project_type:{}\"]]", kind);
-        let facets = urlencoding::encode(&facet_query);
-        let url = format!(
-            "https://api.modrinth.com/v2/search?query={}&facets={}&limit=30&index=relevance",
-            encoded_query, facets
-        );
-        self.status = "Searching Modrinth…".to_owned();
-        match reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(20))
-            .user_agent("RexiumLauncher/0.1")
-            .build()
-            .and_then(|client| client.get(url).send())
-            .and_then(|response| response.error_for_status())
-            .and_then(|response| response.json::<SearchResponse>())
-        {
-            Ok(response) => {
-                self.results = response.hits;
-                self.status = format!("{} results", self.results.len());
+        let kind = self.page.project_type().to_owned();
+        if kind.is_empty() || self.busy { return; }
+        self.busy = true;
+        self.search_kind = kind.clone();
+        self.status("Searching Modrinth...");
+        let query = self.query.trim().to_owned();
+        let tx = self.tx.clone();
+        thread::spawn(move || {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .user_agent("RexiumLauncher/0.2")
+                .build();
+            let result = client.map_err(|e| e.to_string()).and_then(|client| {
+                client.get("https://api.modrinth.com/v2/search")
+                    .query(&[("query", query.as_str()), ("facets", &format!("[[\"project_type:{}\"]]", kind)), ("limit", "30")])
+                    .send().map_err(|e| e.to_string())?
+                    .error_for_status().map_err(|e| e.to_string())?
+                    .json::<SearchResponse>().map_err(|e| e.to_string())
+            });
+            match result {
+                Ok(response) => { let _ = tx.send(WorkerMessage::SearchResults(response.hits)); }
+                Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
-            Err(error) => {
-                self.results.clear();
-                self.status = format!("Search failed: {}", error);
-            }
-        }
+        });
     }
 
-    fn minecraft_dir() -> PathBuf {
-        #[cfg(target_os = "windows")]
-        {
-            if let Ok(appdata) = std::env::var("APPDATA") {
-                return PathBuf::from(appdata).join(".minecraft");
+    fn install_project(&mut self, project: Project) {
+        if self.busy { return; }
+        let kind = self.page.project_type().to_owned();
+        let version = self.settings.minecraft_version.clone();
+        self.busy = true;
+        self.status(format!("Installing {}...", project.title));
+        let tx = self.tx.clone();
+        thread::spawn(move || {
+            match download_modrinth_project(&project.slug, &kind, &version, &RexiumApp::game_dir()) {
+                Ok(path) => { let _ = tx.send(WorkerMessage::Installed(format!("Installed to {}", path.display()))); }
+                Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
-        }
-        #[cfg(target_os = "macos")]
-        {
-            if let Some(home) = dirs::home_dir() {
-                return home.join("Library/Application Support/minecraft");
-            }
-        }
-        dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".minecraft")
+        });
     }
 
-    fn install_project(&mut self, project: &Project, kind: &str) {
-        self.status = format!("Getting {}…", project.title);
-        let client = match reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(45))
-            .user_agent("RexiumLauncher/0.1")
-            .build()
-        {
-            Ok(client) => client,
-            Err(error) => {
-                self.status = format!("Could not start download: {}", error);
-                return;
-            }
-        };
-        let versions_url = format!(
-            "https://api.modrinth.com/v2/project/{}/version",
-            project.project_id
-        );
-        let versions: Vec<serde_json::Value> = match client.get(versions_url).send()
-            .and_then(|response| response.error_for_status())
-            .and_then(|response| response.json())
-        {
-            Ok(versions) => versions,
-            Err(error) => {
-                self.status = format!("Could not load project versions: {}", error);
-                return;
-            }
-        };
-        let mut selected_file = None;
-        for version in versions {
-            if let Some(files) = version.get("files").and_then(|value| value.as_array()) {
-                selected_file = files.iter().find(|file| file.get("primary").and_then(|v| v.as_bool()) == Some(true))
-                    .or_else(|| files.first())
-                    .cloned();
-                if selected_file.is_some() {
-                    break;
+    fn handle_messages(&mut self) {
+        while let Ok(message) = self.rx.try_recv() {
+            self.busy = false;
+            match message {
+                WorkerMessage::Status(text) => self.status(text),
+                WorkerMessage::Installed(text) => {
+                    self.installed = true;
+                    self.status(text);
                 }
+                WorkerMessage::LoggedIn { name, uuid, token } => {
+                    self.account = Some(Account::Microsoft { username: name.clone(), uuid, access_token: token });
+                    self.account_name = Some(name.clone());
+                    self.status(format!("Signed in as {}", name));
+                }
+                WorkerMessage::SearchResults(results) => {
+                    self.results = results;
+                    self.status(format!("{} results", self.results.len()));
+                }
+                WorkerMessage::Error(error) => self.status(error),
+                WorkerMessage::Launched => self.status("Minecraft started."),
             }
         }
-        let file = match selected_file {
-            Some(file) => file,
-            None => {
-                self.status = "No downloadable file was found for this project.".to_owned();
-                return;
-            }
-        };
-        let url = match file.get("url").and_then(|value| value.as_str()) {
-            Some(url) => url.to_owned(),
-            None => {
-                self.status = "The download URL is missing.".to_owned();
-                return;
-            }
-        };
-        let filename = file.get("filename").and_then(|value| value.as_str())
-            .unwrap_or("download")
-            .replace(['/', '\\'], "_");
-        let target_dir = match kind {
-            "mod" => Self::minecraft_dir().join("mods"),
-            "resourcepack" => Self::minecraft_dir().join("resourcepacks"),
-            _ => dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
-                .join("RexiumLauncher").join("Downloads"),
-        };
-        if let Err(error) = fs::create_dir_all(&target_dir) {
-            self.status = format!("Could not create install folder: {}", error);
-            return;
-        }
-        self.status = format!("Downloading {}…", filename);
-        match client.get(url).send().and_then(|response| response.error_for_status())
-            .and_then(|response| response.bytes())
-        {
-            Ok(bytes) => {
-                let destination = target_dir.join(&filename);
-                match fs::write(&destination, &bytes) {
-                    Ok(()) => {
-                        self.status = match kind {
-                            "mod" => format!("Installed {} to .minecraft/mods", project.title),
-                            "resourcepack" => format!("Installed {} to .minecraft/resourcepacks", project.title),
-                            _ => format!("Downloaded {} to RexiumLauncher/Downloads", project.title),
-                        };
+    }
+
+    fn sidebar(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("rexium_sidebar")
+            .exact_width(190.0)
+            .resizable(false)
+            .frame(egui::Frame::new().fill(Color32::from_rgb(8, 13, 11)).inner_margin(14.0))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let (rect, _) = ui.allocate_exact_size(Vec2::splat(34.0), egui::Sense::hover());
+                    let p = ui.painter();
+                    p.rect_filled(rect, 9.0, self.accent());
+                    p.text(rect.center(), egui::Align2::CENTER_CENTER, "R", egui::FontId::proportional(23.0), Color32::BLACK);
+                    ui.label(RichText::new("REXIUM").size(17.0).strong().color(Color32::WHITE));
+                });
+                ui.add_space(30.0);
+                for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
+                    let selected = self.page == page;
+                    let text = format!("{}   {}", page.icon(), page.label());
+                    let button = egui::Button::new(RichText::new(text).size(12.0).strong()
+                        .color(if selected { Color32::WHITE } else { Color32::from_gray(160) }))
+                        .fill(if selected { Color32::from_rgba_unmultiplied(self.accent().r(), self.accent().g(), self.accent().b(), 42) } else { Color32::TRANSPARENT })
+                        .corner_radius(7.0);
+                    if ui.add_sized([ui.available_width(), 38.0], button).clicked() {
+                        self.page = page;
+                        self.results.clear();
                     }
-                    Err(error) => self.status = format!("Could not save file: {}", error),
                 }
-            }
-            Err(error) => self.status = format!("Download failed: {}", error),
-        }
+                ui.add_space(22.0);
+                ui.separator();
+                ui.add_space(12.0);
+                ui.label(RichText::new("TENSURA CLIENT").size(10.0).strong().color(self.accent()));
+                ui.label(RichText::new(format!("Minecraft {}", self.settings.minecraft_version)).size(11.0).color(Color32::from_gray(150)));
+                ui.label(RichText::new("Fabric loader").size(11.0).color(Color32::from_gray(150)));
+                ui.add_space(14.0);
+                if self.busy {
+                    ui.spinner();
+                } else {
+                    ui.label(RichText::new(&self.status).size(10.0).color(Color32::from_gray(145)));
+                }
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                    let account = self.account_name.as_deref().unwrap_or("Not signed in");
+                    ui.label(RichText::new(account).size(11.0).strong().color(Color32::WHITE));
+                });
+            });
     }
 
-    fn load_custom_background(&mut self, ctx: &egui::Context, path: PathBuf) -> Result<(), String> {
-        let is_gif = path.extension().and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
-        let mut decoded = Vec::new();
-        if is_gif {
-            let file = std::fs::File::open(&path).map_err(|error| error.to_string())?;
-            let decoder = image::codecs::gif::GifDecoder::new(BufReader::new(file))
-                .map_err(|error| error.to_string())?;
-            let frames = image::AnimationDecoder::into_frames(decoder)
-                .collect_frames().map_err(|error| error.to_string())?;
-            for frame in frames {
-                decoded.push((frame.into_buffer(), Duration::from_millis(100)));
-            }
-        } else {
-            let image = image::open(&path).map_err(|error| error.to_string())?.to_rgba8();
-            decoded.push((image, Duration::from_secs(1)));
-        }
-        if decoded.is_empty() {
-            return Err("The selected image contains no frames.".to_owned());
-        }
-        self.background_frames = decoded.into_iter().enumerate().map(|(index, (image, delay))| {
-            let size = [image.width() as usize, image.height() as usize];
-            let pixels = image.into_raw();
-            let texture = ctx.load_texture(
-                format!("rexium-custom-background-{index}"),
-                egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
-                egui::TextureOptions::LINEAR,
-            );
-            (texture, delay)
-        }).collect();
-        self.background_started = Instant::now();
-        self.background_path = path.display().to_string();
-        Ok(())
-    }
-
-    fn background(&self, ctx: &egui::Context) {
-        let rect = ctx.screen_rect();
-        let painter = ctx.layer_painter(egui::LayerId::background());
-        painter.rect_filled(rect, 0.0, Color32::from_rgb(11, 16, 12));
-        if self.background_frames.is_empty() {
-            return;
-        }
-        let total: u128 = self.background_frames.iter().map(|(_, delay)| delay.as_millis()).sum();
-        let elapsed = if total > 0 {
-            self.background_started.elapsed().as_millis() % total
-        } else {
-            0
-        };
-        let mut position = 0_u128;
-        let mut selected = 0;
-        for (index, (_, delay)) in self.background_frames.iter().enumerate() {
-            position += delay.as_millis();
-            if elapsed < position {
-                selected = index;
-                break;
-            }
-        }
-        let texture = &self.background_frames[selected].0;
-        painter.image(
-            texture.id(),
-            rect,
-            egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
-        if self.background_frames.len() > 1 {
-            ctx.request_repaint_after(self.background_frames[selected].1);
-        }
-    }
-
-    fn nav_button(&mut self, ui: &mut egui::Ui, page: Page) {
-        let active = self.page == page;
-        let accent = self.accent();
-        let response = ui.add_sized(
-            [ui.available_width(), 42.0],
-            egui::Button::new(
-                RichText::new(page.label())
-                    .size(14.0)
-                    .color(if active { Color32::WHITE } else { Color32::from_rgb(169, 173, 190) }),
-            )
-            .fill(if active {
-                Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 42)
-            } else {
-                Color32::TRANSPARENT
-            })
-            .corner_radius(10.0),
-        );
-        if response.clicked() {
-            self.page = page;
-            self.results.clear();
-            self.status = "Ready".to_owned();
-        }
-    }
-
-    fn header(&self, ui: &mut egui::Ui, title: &str, subtitle: &str) {
-        ui.vertical(|ui| {
-            ui.label(RichText::new(title).size(27.0).strong().color(Color32::WHITE));
-            ui.label(RichText::new(subtitle).size(13.0).color(Color32::from_rgb(145, 160, 145)));
+    fn home(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new("TENSURA CLIENT").size(12.0).strong().color(self.accent()));
+                ui.label(RichText::new("Enter your world.").size(31.0).strong().color(Color32::WHITE));
+                ui.label(RichText::new("A performance-focused Minecraft profile.").size(13.0).color(Color32::from_gray(170)));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(bg) = &self.background {
+                    ui.add(egui::Image::new((bg.id(), Vec2::new(330.0, 155.0))).corner_radius(8.0));
+                } else {
+                    let (rect, _) = ui.allocate_exact_size(Vec2::new(330.0, 155.0), egui::Sense::hover());
+                    let p = ui.painter();
+                    p.rect_filled(rect, 8.0, Color32::from_rgb(22, 36, 28));
+                    p.circle_filled(rect.center() + Vec2::new(70.0, -20.0), 58.0, Color32::from_rgb(36, 102, 67));
+                    p.circle_filled(rect.center() + Vec2::new(70.0, -20.0), 42.0, Color32::from_rgb(76, 178, 118));
+                    p.circle_filled(rect.center() + Vec2::new(56.0, -30.0), 7.0, Color32::WHITE);
+                    p.circle_filled(rect.center() + Vec2::new(83.0, -30.0), 7.0, Color32::WHITE);
+                    p.circle_filled(rect.center() + Vec2::new(56.0, -30.0), 3.0, Color32::BLACK);
+                    p.circle_filled(rect.center() + Vec2::new(83.0, -30.0), 3.0, Color32::BLACK);
+                    p.text(rect.left_bottom() + Vec2::new(14.0, -12.0), egui::Align2::LEFT_BOTTOM, "TENSURA", egui::FontId::proportional(12.0), Color32::WHITE);
+                }
+            });
         });
         ui.add_space(18.0);
-    }
-
-    fn content_browser(&mut self, ui: &mut egui::Ui) {
-        let title = match self.page {
-            Page::Mods => "Mods",
-            Page::Modpacks => "Modpacks",
-            _ => "Resource packs",
-        };
-        self.header(ui, title, "Discover and download community projects from Modrinth.");
-        ui.horizontal(|ui| {
-            let search = ui.add_sized(
-                [ui.available_width() - 112.0, 42.0],
-                egui::TextEdit::singleline(&mut self.query).hint_text("Search projects…"),
-            );
-            if search.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-                self.search();
-            }
-            if ui.add_sized([100.0, 42.0], egui::Button::new("Search").fill(self.accent())).clicked() {
-                self.search();
-            }
-        });
-        ui.add_space(14.0);
-        if self.results.is_empty() {
-            ui.vertical_centered(|ui| {
-                ui.add_space(65.0);
-                ui.label(RichText::new("⌕").size(42.0).color(self.accent()));
-                ui.label(RichText::new("Find something to play").size(18.0).strong());
-                ui.label(RichText::new("Search Modrinth to browse available projects.").color(Color32::from_gray(145)));
+        egui::Frame::new().fill(Color32::from_rgb(14, 22, 18))
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(37, 63, 44)))
+            .corner_radius(9.0).inner_margin(18.0).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Tensura Client").size(21.0).strong().color(Color32::WHITE));
+                        ui.label(RichText::new("Fabric  •  Sodium  •  Iris  •  Performance stack").size(11.0).color(Color32::from_gray(155)));
+                        ui.add_space(10.0);
+                        if self.busy {
+                            ui.add(egui::ProgressBar::new(0.45).desired_width(240.0).animate(true));
+                        } else {
+                            ui.label(RichText::new(if self.installed { "INSTALLED" } else { "NOT INSTALLED" }).size(10.0).strong().color(self.accent()));
+                        }
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.add_sized([180.0, 48.0], egui::Button::new(RichText::new("▶  PLAY").size(17.0).strong().color(Color32::BLACK)).fill(self.accent()).corner_radius(6.0)).clicked() {
+                            self.start_game();
+                        }
+                        if !self.installed && !self.busy && ui.button("Install client").clicked() {
+                            self.start_install();
+                        }
+                    });
+                });
             });
-        } else {
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                for project in self.results.clone() {
-                    egui::Frame::new()
-                        .fill(Color32::from_rgba_unmultiplied(24, 26, 37, 225))
-                        .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(42)))
-                        .corner_radius(12.0)
-                        .inner_margin(14.0)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(RichText::new(&project.title).size(16.0).strong().color(Color32::WHITE));
-                                    ui.label(RichText::new(&project.description).size(12.0).color(Color32::from_rgb(157, 162, 180)));
-                                    ui.label(RichText::new(format!("{} downloads  ·  {}", project.downloads, project.slug))
-                                        .size(11.0).color(Color32::from_rgb(120, 127, 149)));
-                                });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    let label = if self.page == Page::Modpacks { "Download" } else { "Install" };
-                                    if ui.add(egui::Button::new(label).fill(self.accent())).clicked() {
-                                        self.install_project(&project, self.page.project_type());
-                                    }
-                                });
-                            });
-                        });
-                    ui.add_space(8.0);
+        ui.add_space(14.0);
+        ui.columns(2, |columns| {
+            egui::Frame::new().fill(Color32::from_rgb(13, 20, 17)).corner_radius(8.0).inner_margin(14.0).show(&mut columns[0], |ui| {
+                ui.label(RichText::new("PERFORMANCE").size(11.0).strong().color(self.accent()));
+                ui.add_space(8.0);
+                for name in ["Sodium", "Lithium", "FerriteCore", "ImmediatelyFast", "Entity Culling", "ModernFix", "Iris"] {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("✓").color(self.accent()));
+                        ui.label(RichText::new(name).size(12.0).color(Color32::from_gray(205)));
+                    });
                 }
             });
-        }
+            egui::Frame::new().fill(Color32::from_rgb(13, 20, 17)).corner_radius(8.0).inner_margin(14.0).show(&mut columns[1], |ui| {
+                ui.label(RichText::new("ACCOUNT").size(11.0).strong().color(self.accent()));
+                ui.add_space(8.0);
+                ui.label(self.account_name.as_deref().unwrap_or("Microsoft account not connected"));
+                if self.account.is_none() && ui.button("Sign in with Microsoft").clicked() {
+                    self.start_login();
+                }
+                ui.add_space(8.0);
+                ui.label(RichText::new("Shaders are managed separately from performance mods.").size(11.0).color(Color32::from_gray(145)));
+            });
+        });
+    }
+
+    fn browser(&mut self, ui: &mut egui::Ui) {
+        let title = match self.page { Page::Mods => "Mods", Page::ResourcePacks => "Resource packs", _ => "Shaders" };
+        ui.label(RichText::new(title).size(25.0).strong().color(Color32::WHITE));
+        ui.label(RichText::new("Modrinth library").size(12.0).color(Color32::from_gray(150)));
+        ui.add_space(14.0);
+        ui.horizontal(|ui| {
+            let width = (ui.available_width() - 110.0).max(120.0);
+            let field = ui.add_sized([width, 38.0], egui::TextEdit::singleline(&mut self.query).hint_text("Search..."));
+            if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) { self.search(); }
+            if ui.add_sized([100.0, 38.0], egui::Button::new("Search").fill(self.accent())).clicked() { self.search(); }
+        });
+        ui.add_space(12.0);
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for project in self.results.clone() {
+                egui::Frame::new().fill(Color32::from_rgb(15, 23, 19)).corner_radius(7.0).inner_margin(12.0).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(&project.title).size(14.0).strong());
+                            ui.label(RichText::new(&project.description).size(11.0).color(Color32::from_gray(150)));
+                            ui.label(RichText::new(format!("{} downloads", project.downloads)).size(10.0).color(Color32::from_gray(125)));
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("Install").clicked() { self.install_project(project.clone()); }
+                        });
+                    });
+                });
+                ui.add_space(6.0);
+            }
+        });
+    }
+
+    fn settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.label(RichText::new("Settings").size(25.0).strong());
+        ui.add_space(14.0);
+        egui::Frame::new().fill(Color32::from_rgb(14, 22, 18)).corner_radius(8.0).inner_margin(16.0).show(ui, |ui| {
+            ui.label(RichText::new("Tensura Client").size(16.0).strong());
+            ui.horizontal(|ui| {
+                ui.label("Minecraft version");
+                egui::ComboBox::from_id_salt("mc_version").selected_text(&self.settings.minecraft_version).show_ui(ui, |ui| {
+                    for version in ["1.21.1", "1.21.4", "1.21.5", "1.21.8"] {
+                        ui.selectable_value(&mut self.settings.minecraft_version, version.to_owned(), version);
+                    }
+                });
+            });
+            ui.horizontal(|ui| {
+                ui.label("Memory");
+                ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
+            });
+            ui.add_space(10.0);
+            ui.label("Microsoft app client ID");
+            ui.text_edit_singleline(&mut self.settings.microsoft_client_id);
+            ui.label(RichText::new("Required for Microsoft sign-in. Tokens are kept in memory for this session.").size(10.0).color(Color32::from_gray(145)));
+            ui.add_space(10.0);
+            if ui.button("Choose background image").clicked() {
+                if let Some(path) = rfd::FileDialog::new().add_filter("Images", &["png", "jpg", "jpeg", "webp"]).pick_file() {
+                    self.settings.background_path = path.display().to_string();
+                    self.background = Self::load_background(ctx, &self.settings.background_path);
+                }
+            }
+            if ui.button("Clear background").clicked() {
+                self.settings.background_path.clear();
+                self.background = None;
+            }
+            ui.label("Accent");
+            ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
+            if ui.button("Save settings").clicked() {
+                self.save_settings();
+                self.status("Settings saved.");
+            }
+        });
+        ui.add_space(10.0);
+        ui.label(RichText::new(format!("Instance: {}", Self::instance_dir().display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Mods: {}", Self::game_dir().join("mods").display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Resource packs: {}", Self::game_dir().join("resourcepacks").display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Shaders: {}", Self::game_dir().join("shaderpacks").display())).size(10.0).color(Color32::from_gray(130)));
     }
 }
 
 impl eframe::App for RexiumApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.background(ctx);
-        egui::SidePanel::left("rexium_navigation")
-            .exact_width(218.0)
-            .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(12, 22, 15, 246)).inner_margin(16.0))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    if let Some(logo) = &self.logo {
-                        ui.add(egui::Image::new((logo.id(), Vec2::splat(42.0))));
-                    } else {
-                        ui.label(RichText::new("R").size(31.0).strong().color(self.accent()));
-                    }
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("REXIUM").size(18.0).strong().color(Color32::WHITE));
-                        ui.label(RichText::new("MINECRAFT").size(9.0).strong().color(Color32::from_gray(125)));
-                    });
+        self.handle_messages();
+        if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
+        self.sidebar(ctx);
+        egui::TopBottomPanel::top("topbar").exact_height(48.0).frame(egui::Frame::new().fill(Color32::from_rgb(9, 14, 12))).show(ctx, |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.label(RichText::new("REXIUM LAUNCHER").size(10.0).strong().color(Color32::from_gray(150)));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let label = self.account_name.as_deref().unwrap_or("Sign in");
+                    if ui.button(label).clicked() { self.start_login(); }
                 });
-                ui.add_space(34.0);
-                ui.label(RichText::new("LIBRARY").size(10.0).strong().color(Color32::from_gray(112)));
-                ui.add_space(8.0);
-                self.nav_button(ui, Page::Home);
-                self.nav_button(ui, Page::Mods);
-                self.nav_button(ui, Page::Modpacks);
-                self.nav_button(ui, Page::ResourcePacks);
-                ui.add_space(22.0);
-                ui.label(RichText::new("PREFERENCES").size(10.0).strong().color(Color32::from_gray(112)));
-                ui.add_space(8.0);
-                self.nav_button(ui, Page::Settings);
             });
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(Color32::TRANSPARENT).inner_margin(26.0))
-            .show(ctx, |ui| {
-                match self.page {
-                    Page::Home => {
-                        self.header(ui, "Rexium Launcher", "Rexium Launcher is a Minecraft launcher built in Rust.");
-                        egui::Frame::new()
-                            .fill(Color32::from_rgba_unmultiplied(19, 38, 25, 232))
-                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(49, 83, 54)))
-                            .corner_radius(18.0)
-                            .inner_margin(24.0)
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.vertical(|ui| {
-                                        ui.label(RichText::new("Minecraft, your way.").size(28.0).strong().color(Color32::WHITE));
-                                        ui.label(RichText::new("Mods, modpacks and resource packs.").size(13.0).color(Color32::from_gray(165)));
-                                    });
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        let (rect, _) = ui.allocate_exact_size(Vec2::new(190.0, 112.0), egui::Sense::hover());
-                                        let painter = ui.painter();
-                                        let green = self.accent();
-                                        painter.circle_filled(rect.center(), 46.0, Color32::from_rgba_unmultiplied(green.r(), green.g(), green.b(), 35));
-                                        painter.circle_stroke(rect.center(), 39.0, egui::Stroke::new(2.0_f32, green));
-                                        painter.rect_filled(egui::Rect::from_center_size(rect.center(), Vec2::new(52.0, 52.0)), 8.0, Color32::from_rgb(35, 66, 42));
-                                        painter.line_segment([rect.center() + Vec2::new(-15.0, 0.0), rect.center() + Vec2::new(15.0, 0.0)], egui::Stroke::new(4.0_f32, green));
-                                        painter.line_segment([rect.center() + Vec2::new(0.0, -15.0), rect.center() + Vec2::new(0.0, 15.0)], egui::Stroke::new(4.0_f32, green));
-                                        painter.circle_filled(rect.center() + Vec2::new(61.0, -31.0), 5.0, green);
-                                        painter.circle_filled(rect.center() + Vec2::new(-65.0, 27.0), 4.0, green);
-                                    });
-                                });
-                                ui.add_space(18.0);
-                                ui.horizontal(|ui| {
-                                    if ui.add(egui::Button::new("Browse mods").fill(self.accent()).min_size(Vec2::new(130.0, 40.0))).clicked() {
-                                        self.page = Page::Mods;
-                                        self.results.clear();
-                                    }
-                                    if ui.add(egui::Button::new("Explore modpacks").min_size(Vec2::new(150.0, 40.0))).clicked() {
-                                        self.page = Page::Modpacks;
-                                        self.results.clear();
-                                    }
-                                });
-                            });
-                        ui.add_space(20.0);
-                        ui.label(RichText::new("CONTENT LIBRARY").size(11.0).strong().color(Color32::from_gray(130)));
-                        ui.add_space(10.0);
-                        ui.columns(3, |columns| {
-                            for (index, (name, detail, page)) in [
-                                ("Mods", "Add game modifications", Page::Mods),
-                                ("Modpacks", "Download curated setups", Page::Modpacks),
-                                ("Resource packs", "Change your game's look", Page::ResourcePacks),
-                            ].iter().enumerate() {
-                                egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 32, 22, 236))
-                                    .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(43, 69, 47)))
-                                    .corner_radius(14.0).inner_margin(16.0).show(&mut columns[index], |ui| {
-                                        ui.label(RichText::new(*name).size(17.0).strong().color(Color32::WHITE));
-                                        ui.label(RichText::new(*detail).size(11.0).color(Color32::from_gray(145)));
-                                        ui.add_space(14.0);
-                                        if ui.button("Open library  →").clicked() {
-                                            self.page = *page;
-                                            self.results.clear();
-                                        }
-                                    });
-                            }
-                        });
-                    }
-                    Page::Mods | Page::Modpacks | Page::ResourcePacks => self.content_browser(ui),
-                    Page::Settings => {
-                        self.header(ui, "Settings", "Make Rexium feel like yours.");
-                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 34, 23, 238))
-                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(43, 69, 47)))
-                            .corner_radius(14.0).inner_margin(20.0).show(ui, |ui| {
-                                ui.label(RichText::new("Appearance").size(18.0).strong());
-                                ui.add_space(12.0);
-                                ui.label("Accent color");
-                                ui.add(egui::Slider::new(&mut self.accent_hue, 0.0..=1.0).show_value(false));
-                                ui.horizontal(|ui| {
-                                    ui.label("Preview");
-                                    ui.colored_label(self.accent(), "Rexium accent");
-                                });
-                                ui.add_space(16.0);
-                                ui.label("Background image or GIF");
-                                ui.horizontal(|ui| {
-                                    if ui.button("Choose file").clicked() {
-                                        if let Some(path) = rfd::FileDialog::new()
-                                            .add_filter("Images and GIFs", &["png", "jpg", "jpeg", "webp", "gif"])
-                                            .pick_file()
-                                        {
-                                            if let Err(error) = self.load_custom_background(ctx, path) {
-                                                self.status = error;
-                                            }
-                                        }
-                                    }
-                                    if ui.button("Remove background").clicked() {
-                                        self.background_frames.clear();
-                                        self.background_path.clear();
-                                    }
-                                });
-                                if !self.background_path.is_empty() {
-                                    ui.label(RichText::new(&self.background_path).size(11.0).color(Color32::from_gray(145)));
-                                }
-                                ui.label(RichText::new("PNG, JPG, WEBP and animated GIF supported.")
-                                    .size(11.0).color(Color32::from_gray(135)));
-                            });
-                        ui.add_space(14.0);
-                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 34, 23, 238))
-                            .corner_radius(14.0).inner_margin(20.0).show(ui, |ui| {
-                                ui.label(RichText::new("Minecraft folders").size(17.0).strong());
-                                ui.add_space(8.0);
-                                ui.label(RichText::new(Self::minecraft_dir().display().to_string()).size(12.0).color(Color32::from_gray(155)));
-                                ui.label(RichText::new("Mods and resource packs are installed into this Minecraft directory.")
-                                    .size(11.0).color(Color32::from_gray(125)));
-                            });
-                    }
-                }
-            });
-
-
+        });
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::from_rgb(10, 15, 13)).inner_margin(22.0)).show(ctx, |ui| {
+            match self.page {
+                Page::Home => self.home(ui),
+                Page::Mods | Page::ResourcePacks | Page::Shaderpacks => self.browser(ui),
+                Page::Settings => self.settings(ui, ctx),
+            }
+        });
     }
+}
+
+fn find_fabric_version_id(root: &PathBuf, mc_version: &str) -> Option<String> {
+    let entries = fs::read_dir(root.join("versions")).ok()?;
+    entries.flatten().find_map(|entry| {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with(&format!("fabric-loader-{}-", mc_version)) { Some(name) } else { None }
+    })
+}
+
+fn find_java() -> Option<PathBuf> {
+    if let Ok(path) = which::which("java") { return Some(path); }
+    #[cfg(target_os = "windows")]
+    {
+        let candidates = [
+            PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\javaw.exe"),
+            PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\javaw.exe"),
+            PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jre-21\bin\javaw.exe"),
+        ];
+        return candidates.into_iter().find(|p| p.exists());
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
+fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> Result<String, String> {
+    fs::create_dir_all(RexiumApp::game_dir()).map_err(|e| e.to_string())?;
+    for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
+        fs::create_dir_all(RexiumApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
+    }
+    let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {} + Fabric...", version)));
+    let launcher = Launcher::new(RexiumApp::minecraft_dir());
+    let install = launcher.install(InstallRequest {
+        minecraft_version: version.to_owned(),
+        loader: Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
+        java: JavaInstallPolicy::Auto,
+    }).map_err(|e| e.to_string())?;
+    let _ = tx.send(WorkerMessage::Status("Installing performance mods...".to_owned()));
+    let mut installed = Vec::new();
+    let mut skipped = Vec::new();
+    for slug in PERF_MODS {
+        match download_modrinth_project(slug, "mod", version, &RexiumApp::game_dir()) {
+            Ok(_) => installed.push(*slug),
+            Err(_) => skipped.push(*slug),
+        }
+    }
+    let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. Profile: {}",
+        install.version_id, installed.len(), skipped.len(), version, RexiumApp::instance_dir().display());
+    Ok(report)
+}
+
+fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &PathBuf) -> Result<PathBuf, String> {
+    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
+        .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
+    let versions: Vec<serde_json::Value> = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
+        .query(&[("game_versions", format!("[\"{}\"]", mc_version)), ("loaders", "[\"fabric\"]".to_owned())])
+        .send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
+        .json().map_err(|e| e.to_string())?;
+    let file = versions.iter().find_map(|v| {
+        v.get("files")?.as_array()?.iter()
+            .find(|f| f.get("primary").and_then(|x| x.as_bool()) == Some(true))
+            .or_else(|| v.get("files")?.as_array()?.first())
+    }).ok_or_else(|| format!("No compatible {} release for {}", slug, mc_version))?;
+    let url = file.get("url").and_then(|x| x.as_str()).ok_or("Missing file URL")?;
+    let filename = file.get("filename").and_then(|x| x.as_str()).ok_or("Missing filename")?
+        .replace(['/', '\\'], "_");
+    let folder = match kind {
+        "shader" => "shaderpacks",
+        "resourcepack" => "resourcepacks",
+        _ => "mods",
+    };
+    let destination_dir = game_dir.join(folder);
+    fs::create_dir_all(&destination_dir).map_err(|e| e.to_string())?;
+    let bytes = client.get(url).send().map_err(|e| e.to_string())?
+        .error_for_status().map_err(|e| e.to_string())?.bytes().map_err(|e| e.to_string())?;
+    let destination = destination_dir.join(filename);
+    fs::write(&destination, &bytes).map_err(|e| e.to_string())?;
+    Ok(destination)
+}
+
+fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> Result<(String, String, String), String> {
+    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30))
+        .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
+    let device: serde_json::Value = client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
+        .form(&[("client_id", client_id), ("scope", "XboxLive.signin offline_access")])
+        .send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
+        .json().map_err(|e| e.to_string())?;
+    let device_code = device["device_code"].as_str().ok_or("Microsoft did not return a device code")?.to_owned();
+    let user_code = device["user_code"].as_str().ok_or("Microsoft did not return a user code")?.to_owned();
+    let verification_uri = device["verification_uri"].as_str().unwrap_or("https://microsoft.com/link");
+    let interval = device["interval"].as_u64().unwrap_or(5);
+    let expires = device["expires_in"].as_u64().unwrap_or(900);
+    let _ = open::that(verification_uri);
+    let _ = tx.send(WorkerMessage::Status(format!("Go to {} and enter code {}", verification_uri, user_code)));
+    let started = Instant::now();
+    let token: serde_json::Value = loop {
+        if started.elapsed().as_secs() > expires { return Err("Microsoft sign-in expired. Try again.".to_owned()); }
+        thread::sleep(Duration::from_secs(interval));
+        let response = client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+            .form(&[
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                ("client_id", client_id),
+                ("device_code", device_code.as_str()),
+            ]).send().map_err(|e| e.to_string())?;
+        let value: serde_json::Value = response.json().map_err(|e| e.to_string())?;
+        if value.get("access_token").is_some() { break value; }
+        match value["error"].as_str().unwrap_or_default() {
+            "authorization_pending" => continue,
+            "slow_down" => thread::sleep(Duration::from_secs(5)),
+            "authorization_declined" => return Err("Microsoft sign-in was declined.".to_owned()),
+            "expired_token" => return Err("Microsoft sign-in expired. Try again.".to_owned()),
+            _ => return Err(value["error_description"].as_str().unwrap_or("Microsoft sign-in failed.").to_owned()),
+        }
+    };
+    let ms_token = token["access_token"].as_str().ok_or("Missing Microsoft access token")?;
+    let xbl = microsoft_account::authenticate_with_xbl(ms_token).map_err(|e| e.to_string())?;
+    let userhash = xbl.display_claims.xui.first().ok_or("Xbox account did not return a user identity")?.uhs.clone();
+    let xsts = microsoft_account::authenticate_with_xsts(&xbl.token).map_err(|e| e.to_string())?;
+    let mc = microsoft_account::authenticate_with_minecraft(&userhash, &xsts.token).map_err(|e| e.to_string())?;
+    let profile = microsoft_account::get_profile(&mc.access_token).map_err(|e| e.to_string())?;
+    if profile.id.is_empty() || profile.name.is_empty() {
+        return Err("This Microsoft account does not have a Minecraft Java profile.".to_owned());
+    }
+    Ok((profile.name, profile.id, mc.access_token))
 }
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1180.0, 760.0])
-            .with_min_inner_size([900.0, 620.0])
-            .with_title("Rexium Launcher"),
+        viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0])
+            .with_min_inner_size([1000.0, 650.0]).with_title("Rexium Launcher"),
         ..Default::default()
     };
-    eframe::run_native(
-        "Rexium Launcher",
-        options,
-        Box::new(|cc| Ok(Box::new(RexiumApp::new(cc)))),
-    )
+    eframe::run_native("Rexium Launcher", options, Box::new(|cc| Ok(Box::new(RexiumApp::new(cc)))))
 }
