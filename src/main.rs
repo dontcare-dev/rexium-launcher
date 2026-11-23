@@ -415,7 +415,7 @@ impl eframe::App for RexiumApp {
                         self.header(ui, "Rexium Launcher", "Rexium Launcher is a Minecraft launcher built in Rust.");
                         egui::Frame::new()
                             .fill(Color32::from_rgba_unmultiplied(28, 30, 45, 225))
-                            .stroke(egui::Stroke::new(1.0, Color32::from_gray(48)))
+                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(48)))
                             .corner_radius(18.0)
                             .inner_margin(24.0)
                             .show(ui, |ui| {
@@ -445,7 +445,7 @@ impl eframe::App for RexiumApp {
                                 ("Resource packs", "Change your game's look", Page::ResourcePacks),
                             ].iter().enumerate() {
                                 egui::Frame::new().fill(Color32::from_rgba_unmultiplied(23, 25, 36, 230))
-                                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(43)))
+                                    .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(43)))
                                     .corner_radius(14.0).inner_margin(16.0).show(&mut columns[index], |ui| {
                                         ui.label(RichText::new(*name).size(17.0).strong().color(Color32::WHITE));
                                         ui.label(RichText::new(*detail).size(11.0).color(Color32::from_gray(145)));
@@ -462,7 +462,7 @@ impl eframe::App for RexiumApp {
                     Page::Settings => {
                         self.header(ui, "Settings", "Make Rexium feel like yours.");
                         egui::Frame::new().fill(Color32::from_rgba_unmultiplied(24, 26, 37, 230))
-                            .stroke(egui::Stroke::new(1.0, Color32::from_gray(44)))
+                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(44)))
                             .corner_radius(14.0).inner_margin(20.0).show(ui, |ui| {
                                 ui.label(RichText::new("Appearance").size(18.0).strong());
                                 ui.add_space(12.0);
