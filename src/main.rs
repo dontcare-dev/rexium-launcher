@@ -543,7 +543,7 @@ impl RexiumApp {
             ui.label("Accent");
             ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
             if ui.button("Save settings").clicked() {
-                let username = self.settings.offline_username.trim();
+                let username = self.settings.offline_username.trim().to_owned();
                 if !username.is_empty() {
                     self.settings.offline_username = username.chars().take(16).collect();
                     if self.account_name.as_deref().is_some_and(|name| name.ends_with("(offline)")) {
