@@ -1,5 +1,5 @@
 [Setup]
-AppId={{A19D4A26-6B0D-4C7A-9B11-REXIUM000001}
+AppId={{A19D4A26-6B0D-4C7A-9B11-000000000001}
 AppName=Rexium Launcher
 AppVersion=0.2.0
 AppPublisher=Silver Dev Studios
