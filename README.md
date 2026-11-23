@@ -2,26 +2,24 @@
 
 Rexium Launcher is a Minecraft launcher built in Rust.
 
-## Included client
+## Tensura Client
 
-Tensura Client is installed into its own managed instance on first launch. It uses Fabric and a compatible performance stack including Sodium, Lithium, FerriteCore, ImmediatelyFast, Entity Culling, ModernFix, Iris, Dynamic FPS, More Culling, and Noisium where releases are available for the selected Minecraft version.
+Tensura Client installs as the default Fabric profile with a performance mod stack and Complementary Reimagined shaders when compatible releases are available. Mods, resource packs, shader packs, saves, screenshots, and configs are stored in the managed instance game directory.
 
-Complementary Reimagined is installed as the default shader pack when a compatible release is available. Additional mods, resource packs, and shader packs can be searched through Modrinth and installed into the Tensura instance folders.
+## Accounts
 
-## Minecraft account
-
-Microsoft sign-in uses the device-code flow. Add a Microsoft Entra public-client application ID in Settings before signing in. The Microsoft account must own Minecraft: Java Edition. Account tokens are held in memory for the current launcher session.
+Microsoft sign-in is optional. Offline mode is available without a Microsoft account. Offline play is intended for single-player and compatible offline/LAN use; online servers may require a legitimate Microsoft account that owns Minecraft: Java Edition. Microsoft sign-in requires a public-client application ID configured in Settings.
 
 ## Runtime and paths
 
-The launcher installs a Java 21 runtime on Windows when a suitable Java runtime is not found. Minecraft libraries and version metadata are stored under the Tensura instance's managed Minecraft directory. Mods, resource packs, shader packs, saves, screenshots, and configs are stored in the instance game directory.
+The launcher installs a Java 21 runtime on Windows when a compatible runtime is not found. The managed instance is stored under the RexiumLauncher application data directory in `instances/Tensura Client`; the Minecraft libraries and version metadata are stored in that instance's `minecraft` directory, and game data is stored in its `game` directory.
 
 ## Windows installation
 
-Download RexiumLauncherSetup.exe from the Windows Actions artifact and run it. The installer creates Start Menu and optional desktop shortcuts. The client profile downloads on first launch.
+Download `RexiumLauncherSetup.exe` from the `RexiumLauncher-Windows` GitHub Actions artifact and run it. The installer creates Start Menu and optional desktop shortcuts. The Tensura profile is installed on first launch.
 
 ## Build
 
     cargo build --release
 
-Mod and shader downloads are provided by the public Modrinth API. Minecraft files are installed through mc-launcher-core from Mojang version metadata. Rexium Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
+Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang version metadata. Rexium Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
