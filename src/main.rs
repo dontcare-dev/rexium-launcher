@@ -5,7 +5,7 @@ use mc_launcher_core::{account::Account, auth::microsoft_account};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -51,7 +51,6 @@ impl Page {
 
 #[derive(Clone, Deserialize)]
 struct Project {
-    project_id: String,
     title: String,
     description: String,
     downloads: u64,
@@ -439,7 +438,7 @@ impl RexiumApp {
         });
         ui.add_space(18.0);
         egui::Frame::new().fill(Color32::from_rgb(14, 22, 18))
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(37, 63, 44)))
+            .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(37, 63, 44)))
             .corner_radius(9.0).inner_margin(18.0).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
@@ -591,7 +590,7 @@ impl eframe::App for RexiumApp {
     }
 }
 
-fn find_fabric_version_id(root: &PathBuf, mc_version: &str) -> Option<String> {
+fn find_fabric_version_id(root: &Path, mc_version: &str) -> Option<String> {
     let entries = fs::read_dir(root.join("versions")).ok()?;
     entries.flatten().find_map(|entry| {
         let name = entry.file_name().to_string_lossy().to_string();
