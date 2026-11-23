@@ -461,9 +461,9 @@ impl eframe::App for RexiumApp {
                                         let painter = ui.painter();
                                         let green = self.accent();
                                         painter.circle_filled(rect.center(), 46.0, Color32::from_rgba_unmultiplied(green.r(), green.g(), green.b(), 35));
-                                        painter.circle_stroke(rect.center(), 39.0, egui::Stroke::new(2.0, green));
+                                        painter.circle_stroke(rect.center(), 39.0, egui::Stroke::new(2.0_f32, green));
                                         painter.rect_filled(egui::Rect::from_center_size(rect.center(), Vec2::new(52.0, 52.0)), 8.0, Color32::from_rgb(35, 66, 42));
-                                        painter.line_segment([rect.center() + Vec2::new(-15.0, 0.0), rect.center() + Vec2::new(15.0, 0.0)], egui::Stroke::new(4.0, green));
+                                        painter.line_segment([rect.center() + Vec2::new(-15.0, 0.0), rect.center() + Vec2::new(15.0, 0.0)], egui::Stroke::new(4.0_f32, green));
                                         painter.line_segment([rect.center() + Vec2::new(0.0, -15.0), rect.center() + Vec2::new(0.0, 15.0)], egui::Stroke::new(4.0, green));
                                         painter.circle_filled(rect.center() + Vec2::new(61.0, -31.0), 5.0, green);
                                         painter.circle_filled(rect.center() + Vec2::new(-65.0, 27.0), 4.0, green);
