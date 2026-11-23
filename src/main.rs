@@ -598,16 +598,40 @@ fn find_fabric_version_id(root: &Path, mc_version: &str) -> Option<String> {
     })
 }
 
+fn java_major_version(path: &Path) -> Option<u32> {
+    let output = Command::new(path).arg("-version").output().ok()?;
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let marker = text.find("version \"").map(|i| i + 9)
+        .or_else(|| text.find("openjdk ").map(|i| i + 8))?;
+    let digits: String = text[marker..].chars().take_while(|ch| ch.is_ascii_digit() || *ch == '.').collect();
+    let first = digits.split('.').next()?.parse::<u32>().ok()?;
+    Some(if first == 1 {
+        digits.split('.').nth(1)?.parse().ok()?
+    } else {
+        first
+    })
+}
+
 fn find_java() -> Option<PathBuf> {
-    if let Ok(path) = which::which("java") { return Some(path); }
+    if let Ok(path) = which::which("java") {
+        if java_major_version(&path).is_some_and(|version| version >= 21) {
+            return Some(path);
+        }
+    }
     #[cfg(target_os = "windows")]
     {
         let candidates = [
-            PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\javaw.exe"),
-            PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\javaw.exe"),
-            RexiumApp::data_dir().join("runtime").join("bin").join("javaw.exe"),
+            RexiumApp::data_dir().join("runtime").join("bin").join("java.exe"),
+            PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\java.exe"),
+            PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\java.exe"),
         ];
-        return candidates.into_iter().find(|p| p.exists());
+        return candidates.into_iter().find(|path| {
+            path.exists() && java_major_version(path).is_some_and(|version| version >= 21)
+        });
     }
     #[allow(unreachable_code)]
     None
@@ -627,12 +651,12 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
         fn locate(dir: &std::path::Path) -> Option<PathBuf> {
             for entry in fs::read_dir(dir).ok()?.flatten() {
                 let path = entry.path();
-                if path.file_name().is_some_and(|n| n == "javaw.exe") { return Some(path); }
+                if path.file_name().is_some_and(|name| name == "java.exe") { return Some(path); }
                 if path.is_dir() { if let Some(found) = locate(&path) { return Some(found); } }
             }
             None
         }
-        return locate(&runtime_dir).ok_or_else(|| "Java runtime installation did not produce javaw.exe.".to_owned());
+        return locate(&runtime_dir).ok_or_else(|| "Java 21 runtime installation did not produce java.exe.".to_owned());
     }
     #[cfg(not(target_os = "windows"))]
     Err("Install Java 21 or newer and make java available on PATH.".to_owned())
