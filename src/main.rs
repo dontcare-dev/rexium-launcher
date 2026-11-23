@@ -12,7 +12,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const MC_VERSION: &str = "1.21.1";
-const FABRIC_PROFILE: &str = "fabric-loader";
 const PERF_MODS: &[&str] = &[
     "fabric-api", "sodium", "lithium", "ferrite-core", "immediatelyfast",
     "entityculling", "modernfix", "iris", "dynamic-fps", "moreculling", "noisium",
@@ -93,9 +92,7 @@ struct RexiumApp {
     background_started: Instant,
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
-    last_status: Instant,
     installed: bool,
-    search_kind: String,
 }
 
 impl RexiumApp {
@@ -125,9 +122,7 @@ impl RexiumApp {
             background_started: Instant::now(),
             tx,
             rx,
-            last_status: Instant::now(),
             installed: false,
-            search_kind: String::new(),
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
@@ -213,7 +208,6 @@ impl RexiumApp {
 
     fn status(&mut self, text: impl Into<String>) {
         self.status = text.into();
-        self.last_status = Instant::now();
     }
 
     fn start_install(&mut self) {
@@ -305,7 +299,6 @@ impl RexiumApp {
         let kind = self.page.project_type().to_owned();
         if kind.is_empty() || self.busy { return; }
         self.busy = true;
-        self.search_kind = kind.clone();
         self.status("Searching Modrinth...");
         let query = self.query.trim().to_owned();
         let tx = self.tx.clone();
