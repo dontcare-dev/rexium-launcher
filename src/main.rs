@@ -413,7 +413,7 @@ impl eframe::App for RexiumApp {
         egui::SidePanel::left("rexium_navigation")
             .exact_width(218.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(13, 14, 22, 242)).inner_margin(16.0))
+            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(12, 22, 15, 246)).inner_margin(16.0))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if let Some(logo) = &self.logo {
@@ -446,15 +446,29 @@ impl eframe::App for RexiumApp {
                     Page::Home => {
                         self.header(ui, "Rexium Launcher", "Rexium Launcher is a Minecraft launcher built in Rust.");
                         egui::Frame::new()
-                            .fill(Color32::from_rgba_unmultiplied(28, 30, 45, 225))
-                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(48)))
+                            .fill(Color32::from_rgba_unmultiplied(19, 38, 25, 232))
+                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(49, 83, 54)))
                             .corner_radius(18.0)
                             .inner_margin(24.0)
                             .show(ui, |ui| {
-                                ui.label(RichText::new("REXIUM").size(12.0).strong().color(self.accent()));
-                                ui.add_space(8.0);
-                                ui.label(RichText::new("Everything you need.\nNothing in your way.").size(29.0).strong().color(Color32::WHITE));
-                                ui.add_space(8.0);
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("Minecraft, your way.").size(28.0).strong().color(Color32::WHITE));
+                                        ui.label(RichText::new("Mods, modpacks and resource packs.").size(13.0).color(Color32::from_gray(165)));
+                                    });
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let (rect, _) = ui.allocate_exact_size(Vec2::new(190.0, 112.0), egui::Sense::hover());
+                                        let painter = ui.painter();
+                                        let green = self.accent();
+                                        painter.circle_filled(rect.center(), 46.0, Color32::from_rgba_unmultiplied(green.r(), green.g(), green.b(), 35));
+                                        painter.circle_stroke(rect.center(), 39.0, egui::Stroke::new(2.0, green));
+                                        painter.rect_filled(egui::Rect::from_center_size(rect.center(), Vec2::new(52.0, 52.0)), 8.0, Color32::from_rgb(35, 66, 42));
+                                        painter.line_segment([rect.center() + Vec2::new(-15.0, 0.0), rect.center() + Vec2::new(15.0, 0.0)], egui::Stroke::new(4.0, green));
+                                        painter.line_segment([rect.center() + Vec2::new(0.0, -15.0), rect.center() + Vec2::new(0.0, 15.0)], egui::Stroke::new(4.0, green));
+                                        painter.circle_filled(rect.center() + Vec2::new(61.0, -31.0), 5.0, green);
+                                        painter.circle_filled(rect.center() + Vec2::new(-65.0, 27.0), 4.0, green);
+                                    });
+                                });
                                 ui.add_space(18.0);
                                 ui.horizontal(|ui| {
                                     if ui.add(egui::Button::new("Browse mods").fill(self.accent()).min_size(Vec2::new(130.0, 40.0))).clicked() {
@@ -476,8 +490,8 @@ impl eframe::App for RexiumApp {
                                 ("Modpacks", "Download curated setups", Page::Modpacks),
                                 ("Resource packs", "Change your game's look", Page::ResourcePacks),
                             ].iter().enumerate() {
-                                egui::Frame::new().fill(Color32::from_rgba_unmultiplied(23, 25, 36, 230))
-                                    .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(43)))
+                                egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 32, 22, 236))
+                                    .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(43, 69, 47)))
                                     .corner_radius(14.0).inner_margin(16.0).show(&mut columns[index], |ui| {
                                         ui.label(RichText::new(*name).size(17.0).strong().color(Color32::WHITE));
                                         ui.label(RichText::new(*detail).size(11.0).color(Color32::from_gray(145)));
@@ -493,8 +507,8 @@ impl eframe::App for RexiumApp {
                     Page::Mods | Page::Modpacks | Page::ResourcePacks => self.content_browser(ui),
                     Page::Settings => {
                         self.header(ui, "Settings", "Make Rexium feel like yours.");
-                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(24, 26, 37, 230))
-                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_gray(44)))
+                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 34, 23, 238))
+                            .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(43, 69, 47)))
                             .corner_radius(14.0).inner_margin(20.0).show(ui, |ui| {
                                 ui.label(RichText::new("Appearance").size(18.0).strong());
                                 ui.add_space(12.0);
@@ -529,7 +543,7 @@ impl eframe::App for RexiumApp {
                                     .size(11.0).color(Color32::from_gray(135)));
                             });
                         ui.add_space(14.0);
-                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(24, 26, 37, 230))
+                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(18, 34, 23, 238))
                             .corner_radius(14.0).inner_margin(20.0).show(ui, |ui| {
                                 ui.label(RichText::new("Minecraft folders").size(17.0).strong());
                                 ui.add_space(8.0);
