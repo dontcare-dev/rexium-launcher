@@ -4,6 +4,7 @@ use mc_launcher_core::prelude::*;
 use mc_launcher_core::{account::Account, auth::microsoft_account};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -88,7 +89,8 @@ struct RexiumApp {
     settings: Settings,
     account: Option<Account>,
     account_name: Option<String>,
-    background: Option<egui::TextureHandle>,
+    background_frames: Vec<(egui::TextureHandle, Duration)>,
+    background_started: Instant,
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
     last_status: Instant,
@@ -108,7 +110,7 @@ impl RexiumApp {
         style.spacing.item_spacing = Vec2::new(10.0, 10.0);
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
-        let background = Self::load_background(&cc.egui_ctx, &settings.background_path);
+        let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             page: Page::Home,
@@ -119,7 +121,8 @@ impl RexiumApp {
             settings,
             account: None,
             account_name: None,
-            background,
+            background_frames,
+            background_started: Instant::now(),
             tx,
             rx,
             last_status: Instant::now(),
@@ -158,15 +161,46 @@ impl RexiumApp {
         }
     }
 
-    fn load_background(ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
-        if path.is_empty() { return None; }
-        let image = image::open(path).ok()?.to_rgba8();
-        let size = [image.width() as usize, image.height() as usize];
-        Some(ctx.load_texture(
-            "rexium-user-background",
-            egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()),
-            egui::TextureOptions::LINEAR,
-        ))
+    fn load_background(ctx: &egui::Context, path: &str) -> Vec<(egui::TextureHandle, Duration)> {
+        if path.is_empty() { return Vec::new(); }
+        let path_buf = PathBuf::from(path);
+        let is_gif = path_buf.extension().and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
+        let decoded: Vec<(image::RgbaImage, Duration)> = if is_gif {
+            let Ok(file) = fs::File::open(&path_buf) else { return Vec::new(); };
+            let Ok(decoder) = image::codecs::gif::GifDecoder::new(BufReader::new(file)) else { return Vec::new(); };
+            let Ok(frames) = image::AnimationDecoder::into_frames(decoder).collect_frames() else { return Vec::new(); };
+            frames.into_iter().map(|frame| {
+                let delay = frame.delay().numer_denom_ms();
+                let ms = if delay.1 == 0 { 100 } else { (delay.0 / delay.1).max(30) };
+                (frame.into_buffer(), Duration::from_millis(ms as u64))
+            }).collect()
+        } else {
+            let Ok(image) = image::open(&path_buf) else { return Vec::new(); };
+            vec![(image.to_rgba8(), Duration::from_secs(1))]
+        };
+        decoded.into_iter().enumerate().map(|(index, (image, delay))| {
+            let size = [image.width() as usize, image.height() as usize];
+            let texture = ctx.load_texture(
+                format!("rexium-user-background-{index}"),
+                egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()),
+                egui::TextureOptions::LINEAR,
+            );
+            (texture, delay)
+        }).collect()
+    }
+
+    fn background_index(&self) -> usize {
+        if self.background_frames.len() <= 1 { return 0; }
+        let total: u128 = self.background_frames.iter().map(|(_, delay)| delay.as_millis()).sum();
+        if total == 0 { return 0; }
+        let elapsed = self.background_started.elapsed().as_millis() % total;
+        let mut position = 0_u128;
+        for (index, (_, delay)) in self.background_frames.iter().enumerate() {
+            position += delay.as_millis();
+            if elapsed < position { return index; }
+        }
+        0
     }
 
     fn accent(&self) -> Color32 {
@@ -394,7 +428,7 @@ impl RexiumApp {
                 ui.label(RichText::new("A performance-focused Minecraft profile.").size(13.0).color(Color32::from_gray(170)));
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if let Some(bg) = &self.background {
+                if let Some((bg, _)) = self.background_frames.get(self.background_index()) {
                     ui.add(egui::Image::new((bg.id(), Vec2::new(330.0, 155.0))).corner_radius(8.0));
                 } else {
                     let (rect, _) = ui.allocate_exact_size(Vec2::new(330.0, 155.0), egui::Sense::hover());
@@ -514,14 +548,15 @@ impl RexiumApp {
             ui.label(RichText::new("Required for Microsoft sign-in. Tokens are kept in memory for this session.").size(10.0).color(Color32::from_gray(145)));
             ui.add_space(10.0);
             if ui.button("Choose background image").clicked() {
-                if let Some(path) = rfd::FileDialog::new().add_filter("Images", &["png", "jpg", "jpeg", "webp"]).pick_file() {
+                if let Some(path) = rfd::FileDialog::new().add_filter("Images and GIFs", &["png", "jpg", "jpeg", "webp", "gif"]).pick_file() {
                     self.settings.background_path = path.display().to_string();
-                    self.background = Self::load_background(ctx, &self.settings.background_path);
+                    self.background_frames = Self::load_background(ctx, &self.settings.background_path);
+                    self.background_started = Instant::now();
                 }
             }
             if ui.button("Clear background").clicked() {
                 self.settings.background_path.clear();
-                self.background = None;
+                self.background_frames.clear();
             }
             ui.label("Accent");
             ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
@@ -542,6 +577,7 @@ impl eframe::App for RexiumApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_messages();
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
+        if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
         self.sidebar(ctx);
         egui::TopBottomPanel::top("topbar").exact_height(48.0).frame(egui::Frame::new().fill(Color32::from_rgb(9, 14, 12))).show(ctx, |ui| {
             ui.horizontal_centered(|ui| {
