@@ -211,7 +211,7 @@ impl RexiumApp {
         };
         let filename = file.get("filename").and_then(|value| value.as_str())
             .unwrap_or("download")
-            .replace('/', "_").replace('\\', "_");
+            .replace(['/', '\\'], "_");
         let target_dir = match kind {
             "mod" => Self::minecraft_dir().join("mods"),
             "resourcepack" => Self::minecraft_dir().join("resourcepacks"),
