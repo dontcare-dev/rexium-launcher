@@ -60,6 +60,9 @@ struct Project {
 #[derive(Deserialize)]
 struct SearchResponse { hits: Vec<Project> }
 
+#[derive(Clone, Serialize, Deserialize)]
+struct CustomServer { name: String, address: String, players_online: u32, players_max: u32, online: bool }
+
 #[derive(Default, Serialize, Deserialize)]
 struct Settings {
     accent_hue: f32,
@@ -69,6 +72,8 @@ struct Settings {
     minecraft_version: String,
     #[serde(default = "default_offline_username")]
     offline_username: String,
+    #[serde(default)]
+    servers: Vec<CustomServer>,
 }
 
 fn default_offline_username() -> String { "RexiumPlayer".to_owned() }
@@ -96,6 +101,10 @@ struct RexiumApp {
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
     installed: bool,
+    new_server_name: String,
+    new_server_address: String,
+    new_server_players: String,
+    new_server_capacity: String,
 }
 
 impl RexiumApp {
@@ -126,6 +135,10 @@ impl RexiumApp {
             tx,
             rx,
             installed: false,
+            new_server_name: String::new(),
+            new_server_address: String::new(),
+            new_server_players: "0".to_owned(),
+            new_server_capacity: "20".to_owned(),
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
@@ -474,33 +487,65 @@ impl RexiumApp {
                     ui.painter().text(egui::pos2(rect.right()-14.0,rect.center().y), egui::Align2::RIGHT_CENTER, "OPEN ↗", egui::FontId::proportional(9.0), Color32::WHITE);
                     if response.clicked() { let _ = open::that(url); }
                 };
-                banner(ui, "Discord", "Join the Rexium community", "◉", Color32::from_rgb(48,68,143), "https://discord.gg/RdKDd6bmMX");
+                banner(ui, "Discord", "Join the support server", "◉", Color32::from_rgb(48,68,143), "https://discord.gg/BCWaT9PVhh");
                 ui.add_space(9.0);
                 banner(ui, "Modrinth", "Mods, packs and shaders", "◆", Color32::from_rgb(0,105,62), "https://modrinth.com");
                 ui.add_space(17.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("PARTNERED SERVERS").size(10.0).strong().color(Color32::from_gray(175)));
-                    ui.separator();
+                    ui.label(RichText::new("SERVERS").size(10.0).strong().color(Color32::from_gray(175)));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(RichText::new(format!("{} added", self.settings.servers.len())).size(9.0).color(Color32::from_gray(125)));
+                    });
                 });
                 ui.add_space(7.0);
-                for (name, address, tint) in [
-                    ("Hypixel", "mc.hypixel.net", Color32::from_rgb(93,67,32)),
-                    ("CubeCraft", "play.cubecraft.net", Color32::from_rgb(25,75,92)),
-                    ("MCC Island", "play.mccisland.net", Color32::from_rgb(76,53,33)),
-                ] {
-                    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 65.0), egui::Sense::click());
+                egui::Frame::new().fill(Color32::from_rgb(14,20,22)).corner_radius(7.0).inner_margin(10.0).show(ui, |ui| {
+                    ui.label(RichText::new("ADD YOUR SERVER").size(9.0).strong().color(accent));
+                    ui.add_space(5.0);
+                    ui.add(egui::TextEdit::singleline(&mut self.new_server_name).hint_text("Server name").desired_width(f32::INFINITY));
+                    ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("play.example.net").desired_width(f32::INFINITY));
+                    ui.horizontal(|ui| {
+                        ui.add(egui::TextEdit::singleline(&mut self.new_server_players).hint_text("Players").desired_width(62.0));
+                        ui.add(egui::TextEdit::singleline(&mut self.new_server_capacity).hint_text("Max").desired_width(62.0));
+                        if ui.button("＋ Add").clicked() {
+                            let name = self.new_server_name.trim().to_owned();
+                            let address = self.new_server_address.trim().to_owned();
+                            let online = self.new_server_players.parse::<u32>().unwrap_or(0);
+                            let max = self.new_server_capacity.parse::<u32>().unwrap_or(20);
+                            if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
+                                self.settings.servers.push(CustomServer { name, address, players_online: online.min(max), players_max: max.max(1), online: true });
+                                self.new_server_name.clear();
+                                self.new_server_address.clear();
+                                self.save_settings();
+                                self.status("Server added.");
+                            }
+                        }
+                    });
+                    ui.label(RichText::new("Add a name, address and current player count.").size(9.0).color(Color32::from_gray(130)));
+                });
+                ui.add_space(8.0);
+                let mut remove_server = None;
+                for (index, server) in self.settings.servers.iter().enumerate() {
+                    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 58.0), egui::Sense::click());
                     ui.painter().rect_filled(rect, 7.0, Color32::from_rgb(17,23,26));
-                    ui.painter().rect_filled(egui::Rect::from_min_size(rect.left_top(),Vec2::new(4.0,rect.height())), 2.0, tint);
-                    ui.painter().text(egui::pos2(rect.left()+15.0,rect.top()+24.0), egui::Align2::LEFT_CENTER, name, egui::FontId::proportional(13.0), Color32::WHITE);
-                    ui.painter().text(egui::pos2(rect.left()+15.0,rect.top()+45.0), egui::Align2::LEFT_CENTER, address, egui::FontId::proportional(10.0), Color32::from_gray(155));
-                    ui.painter().circle_filled(egui::pos2(rect.right()-15.0,rect.center().y), 4.0, accent);
+                    ui.painter().text(egui::pos2(rect.left()+12.0,rect.top()+20.0), egui::Align2::LEFT_CENTER, &server.name, egui::FontId::proportional(12.0), Color32::WHITE);
+                    ui.painter().text(egui::pos2(rect.left()+12.0,rect.top()+41.0), egui::Align2::LEFT_CENTER, format!("{}  ·  {}/{} players",server.address,server.players_online,server.players_max), egui::FontId::proportional(9.0), Color32::from_gray(150));
+                    let status_color = if server.online { accent } else { Color32::from_rgb(220,75,75) };
+                    ui.painter().circle_filled(egui::pos2(rect.right()-18.0,rect.center().y),4.0,status_color);
                     if response.clicked() {
-                        ui.ctx().copy_text(address.to_owned());
-                        self.status(format!("Copied {} server address", name));
+                        ui.ctx().copy_text(server.address.clone());
+                        self.status(format!("Copied {}",server.address));
                     }
-                    ui.add_space(7.0);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(if server.online { "ONLINE" } else { "OFFLINE" }).size(8.0).color(status_color));
+                        ui.label(RichText::new("Click server card to copy address").size(8.0).color(Color32::from_gray(105)));
+                        if ui.small_button("Remove").clicked() { remove_server = Some(index); }
+                    });
+                    ui.add_space(5.0);
                 }
-                ui.add_space(12.0);
+                if let Some(index) = remove_server {
+                    self.settings.servers.remove(index);
+                    self.save_settings();
+                }
                 egui::Frame::new().fill(Color32::from_rgb(14,20,22)).corner_radius(7.0).inner_margin(12.0).show(ui, |ui| {
                     ui.label(RichText::new("ACCOUNT").size(10.0).strong().color(accent));
                     ui.add_space(5.0);
