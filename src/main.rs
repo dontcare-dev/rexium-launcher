@@ -608,21 +608,28 @@ impl eframe::App for RexiumApp {
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
         if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
         self.sidebar(ctx);
-        egui::TopBottomPanel::top("topbar").exact_height(48.0).frame(egui::Frame::new().fill(Color32::from_rgb(9, 14, 12))).show(ctx, |ui| {
-            ui.horizontal_centered(|ui| {
-                ui.label(RichText::new("REXIUM LAUNCHER").size(10.0).strong().color(Color32::from_gray(150)));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let label = self.account_name.as_deref().unwrap_or("Sign in");
-                    if ui.button(label).clicked() { self.start_login(); }
+        egui::TopBottomPanel::top("topbar").exact_height(54.0)
+            .frame(egui::Frame::new().fill(Color32::from_rgb(5, 11, 13)).inner_margin(egui::Margin::symmetric(18, 0)))
+            .show(ctx, |ui| {
+                ui.horizontal_centered(|ui| {
+                    ui.label(RichText::new("REXIUM").size(16.0).strong().color(Color32::WHITE));
+                    ui.label(RichText::new("LAUNCHER").size(9.0).strong().color(Color32::from_rgb(0, 211, 137)));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let name = self.account_name.as_deref().unwrap_or("Offline player");
+                        egui::ComboBox::from_id_salt("account_menu")
+                            .selected_text(RichText::new(name).size(11.0).color(Color32::WHITE))
+                            .show_ui(ui, |ui| {
+                                if ui.button("Offline mode").clicked() {
+                                    self.account = Some(Account::offline(&self.settings.offline_username));
+                                    self.account_name = Some(format!("{} (offline)", self.settings.offline_username));
+                                }
+                                if ui.button("Sign in with Microsoft").clicked() { self.start_login(); }
+                                if ui.button("Account settings").clicked() { self.page = Page::Settings; }
+                            });
+                    });
                 });
             });
-        });
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::BLACK).inner_margin(22.0)).show(ctx, |ui| {
-            let rect = ui.max_rect();
-            if let Some((background, _)) = self.background_frames.get(self.background_index()) {
-                ui.painter().image(background.id(), rect, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::Pos2::new(1.0, 1.0)), Color32::from_white_alpha(185));
-                ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(105));
-            }
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::from_rgb(8, 12, 14)).inner_margin(22.0)).show(ctx, |ui| {
             match self.page {
                 Page::Home => self.home(ui),
                 Page::Mods | Page::ResourcePacks | Page::Shaderpacks => self.browser(ui),
