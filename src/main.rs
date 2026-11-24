@@ -98,6 +98,8 @@ struct RexiumApp {
     account: Option<Account>,
     account_name: Option<String>,
     background_frames: Vec<(egui::TextureHandle, Duration)>,
+    hero_texture: egui::TextureHandle,
+    logo_texture: egui::TextureHandle,
     background_started: Instant,
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
@@ -121,6 +123,12 @@ impl RexiumApp {
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
         let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
+        let hero_image = image::load_from_memory(include_bytes!("../assets/tensura-hero.jpg")).expect("embedded Tensura hero").to_rgba8();
+        let hero_size = [hero_image.width() as usize, hero_image.height() as usize];
+        let hero_texture = cc.egui_ctx.load_texture("tensura_hero", egui::ColorImage::from_rgba_unmultiplied(hero_size, hero_image.as_raw()), egui::TextureOptions::LINEAR);
+        let logo_image = image::load_from_memory(include_bytes!("../assets/tensura-logo.webp")).expect("embedded Tensura logo").to_rgba8();
+        let logo_size = [logo_image.width() as usize, logo_image.height() as usize];
+        let logo_texture = cc.egui_ctx.load_texture("tensura_logo", egui::ColorImage::from_rgba_unmultiplied(logo_size, logo_image.as_raw()), egui::TextureOptions::LINEAR);
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             page: Page::Home,
@@ -132,6 +140,8 @@ impl RexiumApp {
             account: Some(Account::offline("RexiumPlayer")),
             account_name: Some("RexiumPlayer (offline)".to_owned()),
             background_frames,
+            hero_texture,
+            logo_texture,
             background_started: Instant::now(),
             tx,
             rx,
@@ -400,9 +410,7 @@ impl RexiumApp {
                 ui.add_space(8.0);
                 let (logo, _) = ui.allocate_exact_size(Vec2::splat(46.0), egui::Sense::hover());
                 ui.painter().rect_filled(logo, 12.0, Color32::from_rgb(10, 21, 25));
-                ui.painter().circle_filled(logo.center()+egui::vec2(0.0,2.0), 16.0, Color32::from_rgb(164, 218, 245));
-                ui.painter().circle_filled(logo.center()+egui::vec2(-4.0,-4.0), 5.0, Color32::from_white_alpha(180));
-                ui.painter().ellipse_stroke(logo.center()+egui::vec2(0.0,2.0), egui::vec2(16.0,16.0), egui::Stroke::new(1.4, Color32::from_rgb(100, 156, 190)));
+                ui.painter().image(self.logo_texture.id(), logo.shrink(3.0), egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
                 ui.add_space(25.0);
                 for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
                     let selected = self.page == page;
@@ -449,17 +457,12 @@ impl RexiumApp {
                     let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
                     ui.painter().rect_filled(hero, 10.0, Color32::from_rgb(10, 17, 19));
                     ui.painter().rect_stroke(hero, 10.0, egui::Stroke::new(1.0_f32, Color32::from_rgb(40, 61, 59)), egui::StrokeKind::Inside);
-                    if let Some((texture, _)) = self.background_frames.get(self.background_index()) {
-                        ui.painter().image(texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::from_white_alpha(220));
-                        ui.painter().rect_filled(hero, 10.0, Color32::from_black_alpha(95));
-                    } else {
-                        let center = hero.center();
-                        for radius in [150.0, 105.0, 60.0] {
-                            ui.painter().circle_stroke(center, radius, egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(0, 210, 140, 24)));
-                        }
-                        ui.painter().circle_filled(egui::pos2(hero.right()-55.0, hero.top()+55.0), 2.0, accent);
-                    }
-                    ui.painter().text(hero.left_top()+egui::vec2(22.0,20.0), egui::Align2::LEFT_TOP, "TENSURA CLIENT", egui::FontId::proportional(11.0), accent);
+                    let hero_texture = self.background_frames.get(self.background_index()).map(|frame| &frame.0).unwrap_or(&self.hero_texture);
+                    ui.painter().image(hero_texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
+                    ui.painter().rect_filled(hero, 10.0, Color32::from_black_alpha(105));
+                    let mark = egui::Rect::from_min_size(hero.left_top()+egui::vec2(18.0,15.0), Vec2::splat(48.0));
+                    ui.painter().image(self.logo_texture.id(), mark, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
+                    ui.painter().text(egui::pos2(mark.right()+10.0,mark.center().y), egui::Align2::LEFT_CENTER, "TENSURA CLIENT", egui::FontId::proportional(13.0), Color32::WHITE);
                     ui.painter().text(egui::pos2(hero.left()+22.0, hero.bottom()-102.0), egui::Align2::LEFT_TOP, "Minecraft", egui::FontId::proportional(31.0), Color32::WHITE);
                     ui.painter().text(egui::pos2(hero.left()+22.0, hero.bottom()-64.0), egui::Align2::LEFT_TOP, format!("{}  ·  Fabric", self.settings.minecraft_version), egui::FontId::proportional(13.0), Color32::from_gray(210));
                     let play_rect = egui::Rect::from_min_size(egui::pos2(hero.left()+22.0, hero.bottom()-49.0), Vec2::new(205.0, 38.0));
