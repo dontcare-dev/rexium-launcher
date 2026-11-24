@@ -1,28 +1,28 @@
 [Setup]
 AppId={{A19D4A26-6B0D-4C7A-9B11-000000000001}
-AppName=Rexium Launcher
+AppName=Tensura Launcher
 AppVersion=0.2.0
 AppPublisher=Silver Dev Studios
-DefaultDirName={localappdata}\Programs\Rexium Launcher
-DefaultGroupName=Rexium Launcher
+DefaultDirName={localappdata}\Programs\Tensura Launcher
+DefaultGroupName=Tensura Launcher
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64
 OutputDir=output
-OutputBaseFilename=RexiumLauncherSetup
+OutputBaseFilename=TensuraLauncherSetup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 
 [Files]
-Source: "..\target\release\rexium-launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\target\release\tensura-launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Rexium Launcher"; Filename: "{app}\rexium-launcher.exe"
-Name: "{autodesktop}\Rexium Launcher"; Filename: "{app}\rexium-launcher.exe"; Tasks: desktopicon
+Name: "{group}\Tensura Launcher"; Filename: "{app}\tensura-launcher.exe"
+Name: "{autodesktop}\Tensura Launcher"; Filename: "{app}\tensura-launcher.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Run]
-Filename: "{app}\rexium-launcher.exe"; Description: "Launch Rexium Launcher"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\tensura-launcher.exe"; Description: "Launch Tensura Launcher"; Flags: nowait postinstall skipifsilent
