@@ -408,37 +408,50 @@ impl TensuraApp {
 
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tensura_sidebar")
-            .exact_width(76.0)
+            .exact_width(88.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 15)).inner_margin(9.0))
+            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 12, 22)).inner_margin(egui::Margin::symmetric(12, 16)))
             .show(ctx, |ui| {
-                ui.add_space(8.0);
-                let (logo, _) = ui.allocate_exact_size(Vec2::splat(46.0), egui::Sense::hover());
-                ui.painter().rect_filled(logo, 12.0, Color32::from_rgb(10, 21, 25));
-                ui.painter().image(self.logo_texture.id(), logo.shrink(3.0), egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
-                ui.add_space(25.0);
+                let mark = egui::Image::from_bytes("bytes://tensura-mark.svg", include_bytes!("../assets/tensura-mark.svg"));
+                ui.add_sized(Vec2::splat(52.0), mark);
+                ui.add_space(30.0);
                 for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
                     let selected = self.page == page;
-                    let (rect, response) = ui.allocate_exact_size(Vec2::new(56.0, 58.0), egui::Sense::click());
+                    let icon_bytes: &'static [u8] = match page {
+                        Page::Home => include_bytes!("../assets/nav-home.svg"),
+                        Page::Mods => include_bytes!("../assets/nav-mods.svg"),
+                        Page::ResourcePacks => include_bytes!("../assets/nav-packs.svg"),
+                        Page::Shaderpacks => include_bytes!("../assets/nav-shaders.svg"),
+                        Page::Settings => include_bytes!("../assets/nav-settings.svg"),
+                    };
+                    let (rect, response) = ui.allocate_exact_size(Vec2::new(64.0, 70.0), egui::Sense::click());
                     if response.clicked() {
                         self.page = page;
                         self.results.clear();
                     }
                     if selected {
-                        ui.painter().rect_filled(rect, 9.0, Color32::from_rgb(0, 105, 73));
-                        ui.painter().rect_filled(egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left()+3.0, rect.bottom())), 2.0, Color32::from_rgb(0, 225, 145));
+                        ui.painter().line_segment(
+                            [rect.left_top() + egui::vec2(1.0, 9.0), rect.left_bottom() - egui::vec2(-1.0, 9.0)],
+                            egui::Stroke::new(3.0, Color32::from_rgb(80, 239, 204)),
+                        );
                     }
-                    let color = if selected { Color32::WHITE } else { Color32::from_rgb(145, 160, 160) };
-                    ui.painter().text(egui::pos2(rect.center().x, rect.center().y-7.0), egui::Align2::CENTER_CENTER, page.icon(), egui::FontId::proportional(22.0), color);
-                    ui.painter().text(egui::pos2(rect.center().x, rect.bottom()-9.0), egui::Align2::CENTER_CENTER, page.label(), egui::FontId::proportional(7.5), color);
-                    ui.add_space(5.0);
+                    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 7.0), Vec2::splat(34.0));
+                    ui.put(icon_rect, egui::Image::from_bytes(
+                        format!("bytes://nav-{}.svg", page.label()),
+                        icon_bytes,
+                    ).fit_to_exact_size(icon_rect.size()));
+                    ui.painter().text(
+                        egui::pos2(rect.center().x, rect.bottom() - 8.0),
+                        egui::Align2::CENTER_CENTER,
+                        page.label(),
+                        egui::FontId::proportional(7.5),
+                        if selected { Color32::WHITE } else { Color32::from_rgb(139, 154, 174) },
+                    );
+                    ui.add_space(8.0);
                 }
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                     if self.busy { ui.spinner(); }
-                    else {
-                        ui.painter().circle_filled(ui.cursor().center(), 0.0, Color32::TRANSPARENT);
-                        ui.label(RichText::new("●").size(10.0).color(Color32::from_rgb(0, 210, 130)));
-                    }
+                    else { ui.label(RichText::new("●").size(10.0).color(Color32::from_rgb(78, 235, 174))); }
                 });
             });
     }
@@ -467,35 +480,22 @@ impl TensuraApp {
 
                     let hero_height = (ui.available_height() * 0.66).clamp(350.0, 520.0);
                     let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
-                    let painter = ui.painter().with_clip_rect(hero);
-                    painter.rect_filled(hero, 12.0, Color32::from_rgb(5, 20, 27));
                     if !self.background_frames.is_empty() {
                         let texture = &self.background_frames[self.background_index()].0;
-                        painter.image(texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
-                        painter.rect_filled(hero, 12.0, Color32::from_black_alpha(95));
+                        ui.painter().image(texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
                     } else {
-                        painter.circle_filled(egui::pos2(hero.right()-115.0, hero.top()+130.0), 230.0, Color32::from_rgb(8, 68, 72));
-                        painter.circle_filled(egui::pos2(hero.right()-92.0, hero.top()+122.0), 178.0, Color32::from_rgb(10, 92, 91));
-                        painter.circle_filled(egui::pos2(hero.right()-80.0, hero.top()+115.0), 122.0, Color32::from_rgb(16, 119, 105));
-                        painter.circle_filled(egui::pos2(hero.right()-85.0, hero.top()+112.0), 78.0, Color32::from_rgb(35, 161, 128));
-                        for i in 0..24 {
-                            let x = hero.left() + ((i * 83 + 37) as f32 % hero.width());
-                            let y = hero.top() + ((i * 47 + 19) as f32 % hero.height());
-                            painter.circle_filled(egui::pos2(x,y), if i%4==0 {2.0} else {1.0}, Color32::from_rgba_unmultiplied(190,245,226, if i%3==0 {130} else {65}));
-                        }
-                        let wave = vec![
-                            egui::pos2(hero.left(), hero.bottom()-95.0),
-                            egui::pos2(hero.left()+hero.width()*0.22, hero.bottom()-145.0),
-                            egui::pos2(hero.left()+hero.width()*0.47, hero.bottom()-80.0),
-                            egui::pos2(hero.left()+hero.width()*0.72, hero.bottom()-130.0),
-                            egui::pos2(hero.right(), hero.bottom()-82.0),
-                            hero.right_bottom(), hero.left_bottom()
-                        ];
-                        painter.add(egui::Shape::convex_polygon(wave, Color32::from_rgba_unmultiplied(3,13,20,175), egui::Stroke::NONE));
+                        ui.put(hero, egui::Image::from_bytes(
+                            "bytes://tensura-hero-art.svg",
+                            include_bytes!("../assets/tensura-hero-art.svg"),
+                        ).fit_to_exact_size(hero.size()));
                     }
+                    let painter = ui.painter().with_clip_rect(hero);
+                    painter.rect_filled(hero, 0.0, Color32::from_black_alpha(105));
                     let logo_rect = egui::Rect::from_min_size(hero.left_top()+egui::vec2(28.0,26.0), Vec2::splat(58.0));
-                    painter.rect_filled(logo_rect.expand(5.0), 14.0, Color32::from_black_alpha(85));
-                    painter.image(self.logo_texture.id(), logo_rect, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
+                    ui.put(logo_rect, egui::Image::from_bytes(
+                        "bytes://tensura-mark-hero.svg",
+                        include_bytes!("../assets/tensura-mark.svg"),
+                    ).fit_to_exact_size(logo_rect.size()));
                     painter.text(egui::pos2(logo_rect.right()+20.0, logo_rect.center().y-9.0), egui::Align2::LEFT_CENTER, "TENSURA CLIENT", egui::FontId::proportional(16.0), Color32::WHITE);
                     painter.text(egui::pos2(logo_rect.right()+20.0, logo_rect.center().y+13.0), egui::Align2::LEFT_CENTER, "FABRIC  •  PERFORMANCE PROFILE", egui::FontId::proportional(9.0), Color32::from_rgb(157,205,191));
                     painter.text(egui::pos2(hero.left()+34.0, hero.bottom()-146.0), egui::Align2::LEFT_TOP, "Minecraft", egui::FontId::proportional(43.0), Color32::WHITE);
