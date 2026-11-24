@@ -524,7 +524,7 @@ impl RexiumApp {
                 });
                 ui.add_space(8.0);
                 let mut remove_server = None;
-                for (index, server) in self.settings.servers.iter().enumerate() {
+                for (index, server) in self.settings.servers.clone().iter().enumerate() {
                     let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 58.0), egui::Sense::click());
                     ui.painter().rect_filled(rect, 7.0, Color32::from_rgb(17,23,26));
                     ui.painter().text(egui::pos2(rect.left()+12.0,rect.top()+20.0), egui::Align2::LEFT_CENTER, &server.name, egui::FontId::proportional(12.0), Color32::WHITE);
