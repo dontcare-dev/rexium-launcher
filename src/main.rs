@@ -163,6 +163,7 @@ impl RexiumApp {
                 ram_gb: 4,
                 minecraft_version: MC_VERSION.to_owned(),
                 offline_username: "RexiumPlayer".to_owned(),
+                servers: Vec::new(),
             })
     }
 
