@@ -423,14 +423,14 @@ impl RexiumApp {
                     let hero_height = (ui.available_height() * 0.57).clamp(300.0, 470.0);
                     let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
                     ui.painter().rect_filled(hero, 10.0, Color32::from_rgb(10, 17, 19));
-                    ui.painter().rect_stroke(hero, 10.0, egui::Stroke::new(1.0, Color32::from_rgb(40, 61, 59)), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(hero, 10.0, egui::Stroke::new(1.0_f32, Color32::from_rgb(40, 61, 59)), egui::StrokeKind::Inside);
                     if let Some((texture, _)) = self.background_frames.get(self.background_index()) {
                         ui.painter().image(texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::from_white_alpha(220));
                         ui.painter().rect_filled(hero, 10.0, Color32::from_black_alpha(95));
                     } else {
                         let center = hero.center();
                         for radius in [150.0, 105.0, 60.0] {
-                            ui.painter().circle_stroke(center, radius, egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(0, 210, 140, 24)));
+                            ui.painter().circle_stroke(center, radius, egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(0, 210, 140, 24)));
                         }
                         ui.painter().circle_filled(egui::pos2(hero.right()-55.0, hero.top()+55.0), 2.0, accent);
                     }
@@ -449,7 +449,7 @@ impl RexiumApp {
                     for (idx, label) in ["TENSURA CLIENT", "MODS", "SHADERS"].iter().enumerate() {
                         let rect = egui::Rect::from_min_size(egui::pos2(hero.left()+idx as f32*(tile_w+gap), profile_y), Vec2::new(tile_w, 56.0));
                         ui.painter().rect_filled(rect, 6.0, Color32::from_rgb(17,24,26));
-                        ui.painter().rect_stroke(rect, 6.0, egui::Stroke::new(1.0, Color32::from_rgb(43,57,57)), egui::StrokeKind::Inside);
+                        ui.painter().rect_stroke(rect, 6.0, egui::Stroke::new(1.0_f32, Color32::from_rgb(43,57,57)), egui::StrokeKind::Inside);
                         ui.painter().text(egui::pos2(rect.left()+12.0,rect.center().y), egui::Align2::LEFT_CENTER, format!("＋  {}",label), egui::FontId::proportional(11.0), Color32::from_gray(225));
                         if ui.interact(rect, ui.id().with(("home_tile",idx)), egui::Sense::click()).clicked() {
                             self.page = match idx { 1 => Page::Mods, 2 => Page::Shaderpacks, _ => Page::Home };
