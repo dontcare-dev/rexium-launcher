@@ -23,7 +23,7 @@ enum Page { Home, Mods, ResourcePacks, Shaderpacks, Settings }
 impl Page {
     fn label(self) -> &'static str {
         match self {
-            Self::Home => "PLAY",
+            Self::Home => "HOME",
             Self::Mods => "MODS",
             Self::ResourcePacks => "RESOURCE PACKS",
             Self::Shaderpacks => "SHADERS",
@@ -40,7 +40,7 @@ impl Page {
     }
     fn icon(self) -> &'static str {
         match self {
-            Self::Home => "▶",
+            Self::Home => "⌂",
             Self::Mods => "▦",
             Self::ResourcePacks => "▧",
             Self::Shaderpacks => "◈",
@@ -76,7 +76,7 @@ struct Settings {
     servers: Vec<CustomServer>,
 }
 
-fn default_offline_username() -> String { "RexiumPlayer".to_owned() }
+fn default_offline_username() -> String { "TensuraPlayer".to_owned() }
 
 enum WorkerMessage {
     Status(String),
@@ -88,7 +88,7 @@ enum WorkerMessage {
     ServerStatus { address: String, online: bool, players_online: u32, players_max: u32 },
 }
 
-struct RexiumApp {
+struct TensuraApp {
     page: Page,
     query: String,
     results: Vec<Project>,
@@ -110,7 +110,7 @@ struct RexiumApp {
     new_server_capacity: String,
 }
 
-impl RexiumApp {
+impl TensuraApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
@@ -137,8 +137,8 @@ impl RexiumApp {
             status: "Ready".to_owned(),
             busy: false,
             settings,
-            account: Some(Account::offline("RexiumPlayer")),
-            account_name: Some("RexiumPlayer (offline)".to_owned()),
+            account: Some(Account::offline("TensuraPlayer")),
+            account_name: Some("TensuraPlayer (offline)".to_owned()),
             background_frames,
             hero_texture,
             logo_texture,
@@ -157,7 +157,7 @@ impl RexiumApp {
     }
 
     fn data_dir() -> PathBuf {
-        dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("RexiumLauncher")
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("TensuraLauncher")
     }
     fn instance_dir() -> PathBuf { Self::data_dir().join("instances").join("Tensura Client") }
     fn game_dir() -> PathBuf { Self::instance_dir().join("game") }
@@ -173,7 +173,7 @@ impl RexiumApp {
                 microsoft_client_id: String::new(),
                 ram_gb: 4,
                 minecraft_version: MC_VERSION.to_owned(),
-                offline_username: "RexiumPlayer".to_owned(),
+                offline_username: "TensuraPlayer".to_owned(),
                 servers: Vec::new(),
             })
     }
@@ -206,7 +206,7 @@ impl RexiumApp {
         decoded.into_iter().enumerate().map(|(index, (image, delay))| {
             let size = [image.width() as usize, image.height() as usize];
             let texture = ctx.load_texture(
-                format!("rexium-user-background-{index}"),
+                format!("tensura-user-background-{index}"),
                 egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()),
                 egui::TextureOptions::LINEAR,
             );
@@ -295,14 +295,14 @@ impl RexiumApp {
         let ram = self.settings.ram_gb.clamp(2, 16);
         thread::spawn(move || {
             let result = (|| -> std::result::Result<(), String> {
-                let launcher = Launcher::new(RexiumApp::minecraft_dir());
+                let launcher = Launcher::new(TensuraApp::minecraft_dir());
                 let version = launcher.load_version(&version_id).map_err(|e| e.to_string())?;
                 let java = ensure_java()?;
                 let options = LaunchOptions {
                     account,
                     java_executable: Some(java),
-                    game_directory: Some(RexiumApp::game_dir()),
-                    launcher_name: "Rexium".to_owned(),
+                    game_directory: Some(TensuraApp::game_dir()),
+                    launcher_name: "Tensura".to_owned(),
                     launcher_version: env!("CARGO_PKG_VERSION").to_owned(),
                     ..Default::default()
                 };
@@ -330,7 +330,7 @@ impl RexiumApp {
         thread::spawn(move || {
             let client = reqwest::blocking::Client::builder()
                 .timeout(Duration::from_secs(20))
-                .user_agent("RexiumLauncher/0.2")
+                .user_agent("TensuraLauncher/0.2")
                 .build();
             let result = client.map_err(|e| e.to_string()).and_then(|client| {
                 client.get("https://api.modrinth.com/v2/search")
@@ -354,7 +354,7 @@ impl RexiumApp {
         self.status(format!("Installing {}...", project.title));
         let tx = self.tx.clone();
         thread::spawn(move || {
-            match download_modrinth_project(&project.slug, &kind, &version, &RexiumApp::game_dir()) {
+            match download_modrinth_project(&project.slug, &kind, &version, &TensuraApp::game_dir()) {
                 Ok(path) => { let _ = tx.send(WorkerMessage::Installed(format!("Installed to {}", path.display()))); }
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
@@ -402,7 +402,7 @@ impl RexiumApp {
     }
 
     fn sidebar(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::left("rexium_sidebar")
+        egui::SidePanel::left("tensura_sidebar")
             .exact_width(76.0)
             .resizable(false)
             .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 15)).inner_margin(9.0))
@@ -449,9 +449,9 @@ impl RexiumApp {
                 |ui| {
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("PLAY").size(24.0).strong().color(Color32::WHITE));
+                        ui.label(RichText::new("TENSURA").size(23.0).strong().color(Color32::WHITE));
                         ui.add_space(10.0);
-                        ui.label(RichText::new(" /  REXIUM").size(10.0).color(Color32::from_gray(125)));
+                        ui.label(RichText::new(" /  LAUNCHER").size(10.0).color(Color32::from_gray(125)));
                     });
                     ui.add_space(16.0);
 
@@ -489,7 +489,7 @@ impl RexiumApp {
                     );
                     let play_rect = egui::Rect::from_min_size(egui::pos2(hero.left()+24.0, hero.bottom()-52.0), Vec2::new(196.0, 40.0));
                     ui.painter().rect_filled(play_rect, 4.0, accent);
-                    ui.painter().text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "PLEASE WAIT..." } else { "▶   PLAY" }, egui::FontId::proportional(14.0), Color32::from_rgb(4,24,17));
+                    ui.painter().text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "STARTING..." } else { "▶   LAUNCH" }, egui::FontId::proportional(14.0), Color32::from_rgb(4,24,17));
                     if ui.interact(play_rect, ui.id().with("hero_play"), egui::Sense::click()).clicked() {
                         self.start_game();
                     }
@@ -509,13 +509,13 @@ impl RexiumApp {
                     ui.add_space(18.0);
                     ui.painter().line_segment(
                         [ui.cursor().left_top(), egui::pos2(ui.cursor().right(), ui.cursor().top())],
-                        egui::Stroke::new(1.0, Color32::from_gray(48)),
+                        egui::Stroke::new(1.0_f32, Color32::from_gray(48)),
                     );
                     ui.add_space(12.0);
-                    ui.label(RichText::new("RECENTLY PLAYED").size(10.0).strong().color(Color32::from_gray(150)));
+                    ui.label(RichText::new("INSTANCE").size(10.0).strong().color(Color32::from_gray(150)));
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("◉").size(18.0).color(accent));
+                        ui.label(RichText::new("◉").size(18.0).color(Color32::from_rgb(95,190,255)));
                         ui.label(RichText::new("Tensura Client").size(13.0).color(Color32::WHITE));
                         ui.label(RichText::new(format!("Minecraft {}", self.settings.minecraft_version)).size(10.0).color(Color32::from_gray(130)));
                     });
@@ -527,7 +527,7 @@ impl RexiumApp {
                 ui.label(RichText::new("COMMUNITY").size(10.0).strong().color(Color32::from_gray(135)));
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("◈").size(18.0).color(Color32::from_rgb(125,145,255)));
+                    ui.label(RichText::new("◆").size(18.0).color(Color32::from_rgb(126,151,255)));
                     if ui.add(egui::Button::new(RichText::new("Discord support").size(12.0).color(Color32::WHITE)).frame(false)).clicked() {
                         let _ = open::that("https://discord.gg/BCWaT9PVhh");
                     }
@@ -535,7 +535,7 @@ impl RexiumApp {
                 });
                 ui.add_space(9.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("◆").size(18.0).color(accent));
+                    ui.label(RichText::new("✦").size(18.0).color(Color32::from_rgb(245,190,90)));
                     if ui.add(egui::Button::new(RichText::new("Browse Modrinth").size(12.0).color(Color32::WHITE)).frame(false)).clicked() {
                         let _ = open::that("https://modrinth.com");
                     }
@@ -708,7 +708,7 @@ impl RexiumApp {
     }
 }
 
-impl eframe::App for RexiumApp {
+impl eframe::App for TensuraApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_messages();
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
@@ -780,7 +780,7 @@ fn find_java() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let candidates = [
-            RexiumApp::data_dir().join("runtime").join("bin").join("java.exe"),
+            TensuraApp::data_dir().join("runtime").join("bin").join("java.exe"),
             PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\java.exe"),
             PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\java.exe"),
         ];
@@ -796,7 +796,7 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
     if let Some(java) = find_java() { return Ok(java); }
     #[cfg(target_os = "windows")]
     {
-        let runtime_dir = RexiumApp::data_dir().join("runtime");
+        let runtime_dir = TensuraApp::data_dir().join("runtime");
         fs::create_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
         let bytes = reqwest::blocking::get("https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse")
             .map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
@@ -818,12 +818,12 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
 }
 
 fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
-    fs::create_dir_all(RexiumApp::game_dir()).map_err(|e| e.to_string())?;
+    fs::create_dir_all(TensuraApp::game_dir()).map_err(|e| e.to_string())?;
     for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
-        fs::create_dir_all(RexiumApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
+        fs::create_dir_all(TensuraApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
     }
     let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {} + Fabric...", version)));
-    let launcher = Launcher::new(RexiumApp::minecraft_dir());
+    let launcher = Launcher::new(TensuraApp::minecraft_dir());
     let install = launcher.install(InstallRequest {
         minecraft_version: version.to_owned(),
         loader: Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
@@ -833,21 +833,21 @@ fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Re
     let mut installed = Vec::new();
     let mut skipped = Vec::new();
     for slug in PERF_MODS {
-        match download_modrinth_project(slug, "mod", version, &RexiumApp::game_dir()) {
+        match download_modrinth_project(slug, "mod", version, &TensuraApp::game_dir()) {
             Ok(_) => installed.push(*slug),
             Err(_) => skipped.push(*slug),
         }
     }
-    let shader = download_modrinth_project("complementary-reimagined", "shader", version, &RexiumApp::game_dir());
+    let shader = download_modrinth_project("complementary-reimagined", "shader", version, &TensuraApp::game_dir());
     let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
     let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
-        install.version_id, installed.len(), skipped.len(), version, shader_status, RexiumApp::instance_dir().display());
+        install.version_id, installed.len(), skipped.len(), version, shader_status, TensuraApp::instance_dir().display());
     Ok(report)
 }
 
 fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &Path) -> std::result::Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
-        .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
+        .user_agent("TensuraLauncher/0.2").build().map_err(|e| e.to_string())?;
     let mut request = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
         .query(&[("game_versions", format!("[\"{}\"]", mc_version))]);
     if kind == "mod" { request = request.query(&[("loaders", "[\"fabric\"]")]); }
@@ -877,7 +877,7 @@ fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir:
 
 fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<(String, String, String), String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(30))
-        .user_agent("RexiumLauncher/0.2").build().map_err(|e| e.to_string())?;
+        .user_agent("TensuraLauncher/0.2").build().map_err(|e| e.to_string())?;
     let device: serde_json::Value = client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
         .form(&[("client_id", client_id), ("scope", "XboxLive.signin offline_access")])
         .send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
@@ -924,8 +924,8 @@ fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> std::r
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([1000.0, 650.0]).with_title("Rexium Launcher"),
+            .with_min_inner_size([1000.0, 650.0]).with_title("Tensura Launcher"),
         ..Default::default()
     };
-    eframe::run_native("Rexium Launcher", options, Box::new(|cc| Ok(Box::new(RexiumApp::new(cc)))))
+    eframe::run_native("Tensura Launcher", options, Box::new(|cc| Ok(Box::new(TensuraApp::new(cc)))))
 }
