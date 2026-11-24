@@ -85,6 +85,7 @@ enum WorkerMessage {
     SearchResults(Vec<Project>),
     Error(String),
     Launched,
+    ServerStatus { address: String, online: bool, players_online: u32, players_max: u32 },
 }
 
 struct RexiumApp {
@@ -378,6 +379,14 @@ impl RexiumApp {
                     self.busy = false;
                     self.status("Minecraft started.");
                 }
+                WorkerMessage::ServerStatus { address, online, players_online, players_max } => {
+                    if let Some(server) = self.settings.servers.iter_mut().find(|server| server.address == address) {
+                        server.online = online;
+                        server.players_online = players_online;
+                        server.players_max = players_max.max(1);
+                        self.save_settings();
+                    }
+                }
             }
         }
     }
@@ -513,7 +522,10 @@ impl RexiumApp {
                             let online = self.new_server_players.parse::<u32>().unwrap_or(0);
                             let max = self.new_server_capacity.parse::<u32>().unwrap_or(20);
                             if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
-                                self.settings.servers.push(CustomServer { name, address, players_online: online.min(max), players_max: max.max(1), online: true });
+                                self.settings.servers.push(CustomServer { name, address: address.clone(), players_online: online.min(max), players_max: max.max(1), online: true });
+                                let tx = self.tx.clone();
+                                let query_address = address.clone();
+                                thread::spawn(move || { if let Ok(response) = reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}", query_address)).and_then(|r| r.error_for_status()) { if let Ok(data) = response.json::<serde_json::Value>() { let online = data["online"].as_bool().unwrap_or(false); let players_online = data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max = data["players"]["max"].as_u64().unwrap_or(20) as u32; let _ = tx.send(WorkerMessage::ServerStatus { address: query_address, online, players_online, players_max }); } } });
                                 self.new_server_name.clear();
                                 self.new_server_address.clear();
                                 self.save_settings();
