@@ -537,7 +537,11 @@ impl RexiumApp {
                     }
                     ui.horizontal(|ui| {
                         ui.label(RichText::new(if server.online { "ONLINE" } else { "OFFLINE" }).size(8.0).color(status_color));
-                        ui.label(RichText::new("Click server card to copy address").size(8.0).color(Color32::from_gray(105)));
+                        ui.label(RichText::new("Click card to copy").size(8.0).color(Color32::from_gray(105)));
+                        if ui.small_button(if server.online { "Set offline" } else { "Set online" }).clicked() {
+                            if let Some(item) = self.settings.servers.get_mut(index) { item.online = !item.online; }
+                            self.save_settings();
+                        }
                         if ui.small_button("Remove").clicked() { remove_server = Some(index); }
                     });
                     ui.add_space(5.0);
