@@ -44,7 +44,7 @@ jobs:
             $iscc = Get-ChildItem "C:\ProgramData\chocolatey\lib\innosetup" -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           }
           if (-not $iscc -or -not (Test-Path $iscc)) { throw "Inno Setup compiler was not found." }
-          & $iscc "installer\RexiumLauncher.iss"
+          & $iscc "installer\TensuraLauncher.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows release files
         uses: actions/upload-artifact@v4
