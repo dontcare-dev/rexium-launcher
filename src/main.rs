@@ -444,180 +444,160 @@ impl TensuraApp {
     }
 
     fn home(&mut self, ui: &mut egui::Ui) {
-        let accent = Color32::from_rgb(55, 220, 145);
+        let accent = Color32::from_rgb(52, 225, 157);
+        let muted = Color32::from_rgb(142, 157, 160);
         let available = ui.available_width();
-        let rail_width = 270.0_f32.min((available * 0.34).max(220.0));
+        let rail_width = 292.0_f32.min((available * 0.31).max(250.0));
         ui.horizontal_top(|ui| {
+            let main_width = (available - rail_width - 34.0).max(320.0);
             ui.allocate_ui_with_layout(
-                Vec2::new((available - rail_width - 28.0).max(280.0), ui.available_height()),
+                Vec2::new(main_width, ui.available_height()),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("TENSURA").size(23.0).strong().color(Color32::WHITE));
-                        ui.add_space(10.0);
-                        ui.label(RichText::new(" /  LAUNCHER").size(10.0).color(Color32::from_gray(125)));
+                        ui.label(RichText::new("TENSURA").size(25.0).strong().color(Color32::WHITE));
+                        ui.add_space(8.0);
+                        ui.label(RichText::new("LAUNCHER").size(10.0).strong().color(accent));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(RichText::new("MINECRAFT JAVA").size(9.0).color(muted));
+                        });
                     });
-                    ui.add_space(16.0);
+                    ui.add_space(18.0);
 
-                    let hero_height = (ui.available_height() * 0.62).clamp(300.0, 490.0);
+                    let hero_height = (ui.available_height() * 0.66).clamp(350.0, 520.0);
                     let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
-                    let hero_texture = self.background_frames.get(self.background_index()).map(|frame| &frame.0).unwrap_or(&self.hero_texture);
-                    ui.painter().image(hero_texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
-                    ui.painter().rect_filled(
-                        egui::Rect::from_min_max(egui::pos2(hero.left(), hero.top()), egui::pos2(hero.right(), hero.bottom())),
-                        0.0,
-                        Color32::from_black_alpha(48),
-                    );
-                    let mark = egui::Rect::from_min_size(hero.left_top()+egui::vec2(20.0,18.0), Vec2::splat(54.0));
-                    ui.painter().image(self.logo_texture.id(), mark, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
-                    ui.painter().text(
-                        egui::pos2(mark.right()+12.0, mark.center().y),
-                        egui::Align2::LEFT_CENTER,
-                        "TENSURA CLIENT",
-                        egui::FontId::proportional(14.0),
-                        Color32::WHITE,
-                    );
-                    ui.painter().text(
-                        egui::pos2(hero.left()+24.0, hero.bottom()-112.0),
-                        egui::Align2::LEFT_TOP,
-                        "Minecraft",
-                        egui::FontId::proportional(34.0),
-                        Color32::WHITE,
-                    );
-                    ui.painter().text(
-                        egui::pos2(hero.left()+25.0, hero.bottom()-72.0),
-                        egui::Align2::LEFT_TOP,
-                        format!("{}  ·  Fabric", self.settings.minecraft_version),
-                        egui::FontId::proportional(13.0),
-                        Color32::from_gray(235),
-                    );
-                    let play_rect = egui::Rect::from_min_size(egui::pos2(hero.left()+24.0, hero.bottom()-52.0), Vec2::new(196.0, 40.0));
-                    ui.painter().rect_filled(play_rect, 4.0, accent);
-                    ui.painter().text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "STARTING..." } else { "▶   LAUNCH" }, egui::FontId::proportional(14.0), Color32::from_rgb(4,24,17));
-                    if ui.interact(play_rect, ui.id().with("hero_play"), egui::Sense::click()).clicked() {
-                        self.start_game();
+                    let painter = ui.painter().with_clip_rect(hero);
+                    painter.rect_filled(hero, 12.0, Color32::from_rgb(5, 20, 27));
+                    if !self.background_frames.is_empty() {
+                        let texture = &self.background_frames[self.background_index()].0;
+                        painter.image(texture.id(), hero, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
+                        painter.rect_filled(hero, 12.0, Color32::from_black_alpha(95));
+                    } else {
+                        painter.circle_filled(egui::pos2(hero.right()-115.0, hero.top()+130.0), 230.0, Color32::from_rgb(8, 68, 72));
+                        painter.circle_filled(egui::pos2(hero.right()-92.0, hero.top()+122.0), 178.0, Color32::from_rgb(10, 92, 91));
+                        painter.circle_filled(egui::pos2(hero.right()-80.0, hero.top()+115.0), 122.0, Color32::from_rgb(16, 119, 105));
+                        painter.circle_filled(egui::pos2(hero.right()-85.0, hero.top()+112.0), 78.0, Color32::from_rgb(35, 161, 128));
+                        for i in 0..24 {
+                            let x = hero.left() + ((i * 83 + 37) as f32 % hero.width());
+                            let y = hero.top() + ((i * 47 + 19) as f32 % hero.height());
+                            painter.circle_filled(egui::pos2(x,y), if i%4==0 {2.0} else {1.0}, Color32::from_rgba_unmultiplied(190,245,226, if i%3==0 {130} else {65}));
+                        }
+                        let wave = vec![
+                            egui::pos2(hero.left(), hero.bottom()-95.0),
+                            egui::pos2(hero.left()+hero.width()*0.22, hero.bottom()-145.0),
+                            egui::pos2(hero.left()+hero.width()*0.47, hero.bottom()-80.0),
+                            egui::pos2(hero.left()+hero.width()*0.72, hero.bottom()-130.0),
+                            egui::pos2(hero.right(), hero.bottom()-82.0),
+                            hero.right_bottom(), hero.left_bottom()
+                        ];
+                        painter.add(egui::Shape::convex_polygon(wave, Color32::from_rgba_unmultiplied(3,13,20,175), egui::Stroke::NONE));
                     }
+                    let logo_rect = egui::Rect::from_min_size(hero.left_top()+egui::vec2(28.0,26.0), Vec2::splat(58.0));
+                    painter.rect_filled(logo_rect.expand(5.0), 14.0, Color32::from_black_alpha(85));
+                    painter.image(self.logo_texture.id(), logo_rect, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0,1.0)), Color32::WHITE);
+                    painter.text(egui::pos2(logo_rect.right()+20.0, logo_rect.center().y-9.0), egui::Align2::LEFT_CENTER, "TENSURA CLIENT", egui::FontId::proportional(16.0), Color32::WHITE);
+                    painter.text(egui::pos2(logo_rect.right()+20.0, logo_rect.center().y+13.0), egui::Align2::LEFT_CENTER, "FABRIC  •  PERFORMANCE PROFILE", egui::FontId::proportional(9.0), Color32::from_rgb(157,205,191));
+                    painter.text(egui::pos2(hero.left()+34.0, hero.bottom()-146.0), egui::Align2::LEFT_TOP, "Minecraft", egui::FontId::proportional(43.0), Color32::WHITE);
+                    painter.text(egui::pos2(hero.left()+37.0, hero.bottom()-94.0), egui::Align2::LEFT_TOP, format!("{}  /  FABRIC", self.settings.minecraft_version), egui::FontId::proportional(13.0), Color32::from_rgb(207,226,220));
+                    let play_rect = egui::Rect::from_min_size(egui::pos2(hero.left()+34.0, hero.bottom()-62.0), Vec2::new(218.0, 46.0));
+                    painter.rect_filled(play_rect, 7.0, accent);
+                    painter.text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "PLEASE WAIT..." } else { "▶    PLAY" }, egui::FontId::proportional(15.0), Color32::from_rgb(3,25,18));
+                    if ui.interact(play_rect, ui.id().with("tensura_play"), egui::Sense::click()).clicked() { self.start_game(); }
 
                     ui.add_space(22.0);
                     ui.horizontal(|ui| {
                         for (label, page) in [("MODS", Page::Mods), ("RESOURCE PACKS", Page::ResourcePacks), ("SHADERS", Page::Shaderpacks), ("SETTINGS", Page::Settings)] {
                             let selected = self.page == page;
-                            let color = if selected { accent } else { Color32::from_gray(175) };
+                            let color = if selected { accent } else { muted };
                             if ui.add(egui::Button::new(RichText::new(label).size(10.0).strong().color(color)).frame(false)).clicked() {
                                 self.page = page;
                                 self.results.clear();
                             }
-                            ui.add_space(12.0);
+                            ui.add_space(17.0);
                         }
                     });
-                    ui.add_space(18.0);
-                    ui.painter().line_segment(
-                        [ui.cursor().left_top(), egui::pos2(ui.cursor().right(), ui.cursor().top())],
-                        egui::Stroke::new(1.0_f32, Color32::from_gray(48)),
-                    );
                     ui.add_space(12.0);
-                    ui.label(RichText::new("INSTANCE").size(10.0).strong().color(Color32::from_gray(150)));
-                    ui.add_space(6.0);
+                    ui.separator();
+                    ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("◉").size(18.0).color(Color32::from_rgb(95,190,255)));
+                        ui.label(RichText::new("INSTANCE").size(10.0).strong().color(muted));
+                        ui.add_space(14.0);
+                        ui.label(RichText::new("●").size(9.0).color(accent));
                         ui.label(RichText::new("Tensura Client").size(13.0).color(Color32::WHITE));
-                        ui.label(RichText::new(format!("Minecraft {}", self.settings.minecraft_version)).size(10.0).color(Color32::from_gray(130)));
+                        ui.label(RichText::new(format!("Minecraft {}", self.settings.minecraft_version)).size(10.0).color(muted));
                     });
                 },
             );
-            ui.add_space(28.0);
+            ui.add_space(30.0);
             ui.allocate_ui_with_layout(Vec2::new(rail_width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
+                ui.add_space(18.0);
+                ui.label(RichText::new("COMMUNITY").size(10.0).strong().color(muted));
                 ui.add_space(12.0);
-                ui.label(RichText::new("COMMUNITY").size(10.0).strong().color(Color32::from_gray(135)));
-                ui.add_space(10.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("◆").size(18.0).color(Color32::from_rgb(126,151,255)));
-                    if ui.add(egui::Button::new(RichText::new("Discord support").size(12.0).color(Color32::WHITE)).frame(false)).clicked() {
-                        let _ = open::that("https://discord.gg/BCWaT9PVhh");
-                    }
-                    ui.label(RichText::new("↗").size(10.0).color(Color32::from_gray(125)));
+                    ui.label(RichText::new("◈").size(19.0).color(Color32::from_rgb(119,151,255)));
+                    if ui.add(egui::Button::new(RichText::new("Discord support").size(13.0).color(Color32::WHITE)).frame(false)).clicked() { let _ = open::that("https://discord.gg/BCWaT9PVhh"); }
+                    ui.label(RichText::new("↗").size(10.0).color(muted));
                 });
-                ui.add_space(9.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("✦").size(18.0).color(Color32::from_rgb(245,190,90)));
-                    if ui.add(egui::Button::new(RichText::new("Browse Modrinth").size(12.0).color(Color32::WHITE)).frame(false)).clicked() {
-                        let _ = open::that("https://modrinth.com");
-                    }
-                    ui.label(RichText::new("↗").size(10.0).color(Color32::from_gray(125)));
-                });
-                ui.add_space(24.0);
-                ui.label(RichText::new("YOUR SERVERS").size(10.0).strong().color(Color32::from_gray(135)));
                 ui.add_space(8.0);
-                ui.add(egui::TextEdit::singleline(&mut self.new_server_name).hint_text("Server name").desired_width(f32::INFINITY));
-                ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Server address").desired_width(f32::INFINITY));
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_players).hint_text("Players").desired_width(72.0));
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_capacity).hint_text("Max").desired_width(58.0));
-                    if ui.add(egui::Button::new(RichText::new("+ Add").color(accent)).frame(false)).clicked() {
-                        let name = self.new_server_name.trim().to_owned();
-                        let address = self.new_server_address.trim().to_owned();
-                        let online = self.new_server_players.parse::<u32>().unwrap_or(0);
-                        let max = self.new_server_capacity.parse::<u32>().unwrap_or(20).max(1);
+                    ui.label(RichText::new("◇").size(19.0).color(Color32::from_rgb(245,190,90)));
+                    if ui.add(egui::Button::new(RichText::new("Browse Modrinth").size(13.0).color(Color32::WHITE)).frame(false)).clicked() { let _ = open::that("https://modrinth.com"); }
+                    ui.label(RichText::new("↗").size(10.0).color(muted));
+                });
+                ui.add_space(30.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("YOUR SERVERS").size(10.0).strong().color(muted));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { ui.label(RichText::new(format!("{}", self.settings.servers.len())).size(10.0).color(muted)); });
+                });
+                ui.add_space(10.0);
+                ui.add(egui::TextEdit::singleline(&mut self.new_server_name).hint_text("Server name").desired_width(f32::INFINITY));
+                ui.add_space(5.0);
+                ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Server address").desired_width(f32::INFINITY));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.new_server_players).hint_text("Online").desired_width(62.0));
+                    ui.add(egui::TextEdit::singleline(&mut self.new_server_capacity).hint_text("Slots").desired_width(62.0));
+                    if ui.add(egui::Button::new(RichText::new("ADD").size(11.0).strong().color(accent)).frame(false)).clicked() {
+                        let name=self.new_server_name.trim().to_owned(); let address=self.new_server_address.trim().to_owned();
+                        let online=self.new_server_players.parse::<u32>().unwrap_or(0); let max=self.new_server_capacity.parse::<u32>().unwrap_or(20).max(1);
                         if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
-                            self.settings.servers.push(CustomServer { name, address: address.clone(), players_online: online.min(max), players_max: max, online: true });
-                            let tx = self.tx.clone();
-                            let query_address = address.clone();
-                            thread::spawn(move || {
-                                if let Ok(response) = reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}", query_address)).and_then(|r| r.error_for_status()) {
-                                    if let Ok(data) = response.json::<serde_json::Value>() {
-                                        let online = data["online"].as_bool().unwrap_or(false);
-                                        let players_online = data["players"]["online"].as_u64().unwrap_or(0) as u32;
-                                        let players_max = data["players"]["max"].as_u64().unwrap_or(20) as u32;
-                                        let _ = tx.send(WorkerMessage::ServerStatus { address: query_address, online, players_online, players_max });
-                                    }
-                                }
-                            });
-                            self.new_server_name.clear();
-                            self.new_server_address.clear();
-                            self.save_settings();
+                            self.settings.servers.push(CustomServer{name,address:address.clone(),players_online:online.min(max),players_max:max,online:true});
+                            let tx=self.tx.clone(); let query_address=address.clone();
+                            thread::spawn(move || { if let Ok(response)=reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}",query_address)).and_then(|r|r.error_for_status()) { if let Ok(data)=response.json::<serde_json::Value>() { let online=data["online"].as_bool().unwrap_or(false); let players_online=data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max=data["players"]["max"].as_u64().unwrap_or(20) as u32; let _=tx.send(WorkerMessage::ServerStatus{address:query_address,online,players_online,players_max}); } } });
+                            self.new_server_name.clear(); self.new_server_address.clear(); self.save_settings();
                         }
                     }
                 });
-                ui.add_space(8.0);
-                let mut remove_server = None;
-                for (index, server) in self.settings.servers.clone().iter().enumerate() {
+                ui.add_space(10.0);
+                let mut remove_server=None;
+                for (index,server) in self.settings.servers.clone().iter().enumerate() {
                     ui.horizontal(|ui| {
-                        let status_color = if server.online { accent } else { Color32::from_rgb(225,85,85) };
-                        ui.label(RichText::new("●").size(8.0).color(status_color));
+                        let c=if server.online {accent} else {Color32::from_rgb(225,85,85)};
+                        ui.label(RichText::new("●").size(9.0).color(c));
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(&server.name).size(11.0).color(Color32::WHITE));
-                            ui.label(RichText::new(format!("{}/{}  ·  {}", server.players_online, server.players_max, server.address)).size(9.0).color(Color32::from_gray(130)));
+                            ui.label(RichText::new(&server.name).size(12.0).color(Color32::WHITE));
+                            ui.label(RichText::new(format!("{}  ·  {}/{}",if server.online {"ONLINE"} else {"OFFLINE"},server.players_online,server.players_max)).size(9.0).color(muted));
                         });
                         if ui.small_button("↻").clicked() {
-                            let tx = self.tx.clone();
-                            let address = server.address.clone();
-                            thread::spawn(move || {
-                                if let Ok(response) = reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}", address)).and_then(|r| r.error_for_status()) {
-                                    if let Ok(data) = response.json::<serde_json::Value>() {
-                                        let online = data["online"].as_bool().unwrap_or(false);
-                                        let players_online = data["players"]["online"].as_u64().unwrap_or(0) as u32;
-                                        let players_max = data["players"]["max"].as_u64().unwrap_or(20) as u32;
-                                        let _ = tx.send(WorkerMessage::ServerStatus { address, online, players_online, players_max });
-                                    }
-                                }
-                            });
+                            let tx=self.tx.clone(); let address=server.address.clone();
+                            thread::spawn(move || { if let Ok(response)=reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}",address)).and_then(|r|r.error_for_status()) { if let Ok(data)=response.json::<serde_json::Value>() { let online=data["online"].as_bool().unwrap_or(false); let players_online=data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max=data["players"]["max"].as_u64().unwrap_or(20) as u32; let _=tx.send(WorkerMessage::ServerStatus{address,online,players_online,players_max}); } } });
                         }
-                        if ui.small_button("×").clicked() { remove_server = Some(index); }
+                        if ui.small_button("×").clicked() { remove_server=Some(index); }
                     });
-                    ui.add_space(7.0);
+                    ui.add_space(9.0);
                 }
-                if let Some(index) = remove_server {
-                    self.settings.servers.remove(index);
-                    self.save_settings();
-                }
-                ui.add_space(22.0);
-                ui.label(RichText::new("ACCOUNT").size(10.0).strong().color(Color32::from_gray(135)));
-                ui.add_space(5.0);
-                ui.label(RichText::new(self.account_name.as_deref().unwrap_or("Offline mode")).size(12.0).color(Color32::WHITE));
-                if ui.add(egui::Button::new(RichText::new("Microsoft sign-in  ↗").size(10.0).color(Color32::from_gray(160))).frame(false)).clicked() {
-                    self.start_login();
-                }
+                if let Some(index)=remove_server { self.settings.servers.remove(index); self.save_settings(); }
+                ui.add_space(30.0);
+                ui.label(RichText::new("ACCOUNT").size(10.0).strong().color(muted));
+                ui.add_space(9.0);
+                ui.label(RichText::new(self.account_name.as_deref().unwrap_or("Offline player")).size(13.0).color(Color32::WHITE));
+                if ui.add(egui::Button::new(RichText::new("Microsoft sign-in  ↗").size(10.0).color(muted)).frame(false)).clicked() { self.start_login(); }
+                ui.add_space(18.0);
+                ui.separator();
+                ui.add_space(12.0);
+                ui.label(RichText::new("STATUS").size(10.0).strong().color(muted));
+                ui.label(RichText::new(&self.status).size(11.0).color(Color32::from_rgb(176,198,190)));
             });
         });
     }
@@ -723,7 +703,7 @@ impl eframe::App for TensuraApp {
             .frame(egui::Frame::new().fill(Color32::from_rgb(5, 11, 13)).inner_margin(egui::Margin::symmetric(18, 0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.label(RichText::new("REXIUM").size(16.0).strong().color(Color32::WHITE));
+                    ui.label(RichText::new("TENSURA").size(16.0).strong().color(Color32::WHITE));
                     ui.label(RichText::new("LAUNCHER").size(9.0).strong().color(Color32::from_rgb(0, 211, 137)));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let name = self.account_name.as_deref().unwrap_or("Offline player");
