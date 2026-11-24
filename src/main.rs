@@ -399,8 +399,10 @@ impl RexiumApp {
             .show(ctx, |ui| {
                 ui.add_space(8.0);
                 let (logo, _) = ui.allocate_exact_size(Vec2::splat(46.0), egui::Sense::hover());
-                ui.painter().rect_filled(logo, 12.0, Color32::from_rgb(0, 205, 133));
-                ui.painter().text(logo.center(), egui::Align2::CENTER_CENTER, "R", egui::FontId::proportional(29.0), Color32::from_rgb(3, 22, 17));
+                ui.painter().rect_filled(logo, 12.0, Color32::from_rgb(10, 21, 25));
+                ui.painter().circle_filled(logo.center()+egui::vec2(0.0,2.0), 16.0, Color32::from_rgb(164, 218, 245));
+                ui.painter().circle_filled(logo.center()+egui::vec2(-4.0,-4.0), 5.0, Color32::from_white_alpha(180));
+                ui.painter().ellipse_stroke(logo.center()+egui::vec2(0.0,2.0), egui::vec2(16.0,16.0), egui::Stroke::new(1.4, Color32::from_rgb(100, 156, 190)));
                 ui.add_space(25.0);
                 for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
                     let selected = self.page == page;
@@ -554,6 +556,11 @@ impl RexiumApp {
                         if ui.small_button(if server.online { "Set offline" } else { "Set online" }).clicked() {
                             if let Some(item) = self.settings.servers.get_mut(index) { item.online = !item.online; }
                             self.save_settings();
+                        }
+                        if ui.small_button("Refresh").clicked() {
+                            let tx = self.tx.clone();
+                            let address = server.address.clone();
+                            thread::spawn(move || { if let Ok(response) = reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}", address)).and_then(|r| r.error_for_status()) { if let Ok(data) = response.json::<serde_json::Value>() { let online = data["online"].as_bool().unwrap_or(false); let players_online = data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max = data["players"]["max"].as_u64().unwrap_or(20) as u32; let _ = tx.send(WorkerMessage::ServerStatus { address, online, players_online, players_max }); } } });
                         }
                         if ui.small_button("Remove").clicked() { remove_server = Some(index); }
                     });
