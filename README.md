@@ -1,6 +1,6 @@
-# Rexium Launcher
+# Tensura Launcher
 
-Rexium Launcher is a Minecraft launcher built in Rust.
+Tensura Launcher is a Minecraft launcher built in Rust.
 
 ## Tensura Client
 
@@ -12,14 +12,14 @@ Microsoft sign-in is optional. Offline mode is available without a Microsoft acc
 
 ## Runtime and paths
 
-The launcher installs a Java 21 runtime on Windows when a compatible runtime is not found. The managed instance is stored under the RexiumLauncher application data directory in `instances/Tensura Client`; the Minecraft libraries and version metadata are stored in that instance's `minecraft` directory, and game data is stored in its `game` directory.
+The launcher installs a Java 21 runtime on Windows when a compatible runtime is not found. The managed instance is stored under the TensuraLauncher application data directory in `instances/Tensura Client`; the Minecraft libraries and version metadata are stored in that instance's `minecraft` directory, and game data is stored in its `game` directory.
 
 ## Windows installation
 
-Download `RexiumLauncherSetup.exe` from the `RexiumLauncher-Windows` GitHub Actions artifact and run it. The installer creates Start Menu and optional desktop shortcuts. The Tensura profile is installed on first launch.
+Download `TensuraLauncherSetup.exe` from the `TensuraLauncher-Windows` GitHub Actions artifact and run it. The installer creates Start Menu and optional desktop shortcuts. The Tensura profile is installed on first launch.
 
 ## Build
 
     cargo build --release
 
-Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang version metadata. Rexium Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
+Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang version metadata. Tensura Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
