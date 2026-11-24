@@ -1,4 +1,4 @@
-name: Build Rexium Launcher
+name: Build Tensura Launcher
 
 on:
   push:
@@ -49,8 +49,8 @@ jobs:
       - name: Upload Windows release files
         uses: actions/upload-artifact@v4
         with:
-          name: RexiumLauncher-Windows
+          name: TensuraLauncher-Windows
           path: |
-            target/release/rexium-launcher.exe
-            installer/output/RexiumLauncherSetup.exe
+            target/release/tensura-launcher.exe
+            installer/output/TensuraLauncherSetup.exe
           if-no-files-found: error
