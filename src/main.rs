@@ -112,6 +112,7 @@ struct TensuraApp {
 
 impl TensuraApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        egui_extras::install_image_loaders(&cc.egui_ctx);
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
         style.visuals.window_fill = Color32::BLACK;
