@@ -124,10 +124,14 @@ impl TensuraApp {
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
         let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
-        let hero_image = image::load_from_memory(include_bytes!("../assets/tensura-hero.jpg")).expect("embedded Tensura hero").to_rgba8();
+        let hero_image = image::load_from_memory(include_bytes!("../assets/tensura-hero.jpg"))
+            .map(|image| image.to_rgba8())
+            .unwrap_or_else(|_| image::RgbaImage::from_pixel(2, 2, image::Rgba([8, 18, 22, 255])));
         let hero_size = [hero_image.width() as usize, hero_image.height() as usize];
         let hero_texture = cc.egui_ctx.load_texture("tensura_hero", egui::ColorImage::from_rgba_unmultiplied(hero_size, hero_image.as_raw()), egui::TextureOptions::LINEAR);
-        let logo_image = image::load_from_memory(include_bytes!("../assets/tensura-logo.webp")).expect("embedded Tensura logo").to_rgba8();
+        let logo_image = image::load_from_memory(include_bytes!("../assets/tensura-logo.webp"))
+            .map(|image| image.to_rgba8())
+            .unwrap_or_else(|_| image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 190, 130, 255])));
         let logo_size = [logo_image.width() as usize, logo_image.height() as usize];
         let logo_texture = cc.egui_ctx.load_texture("tensura_logo", egui::ColorImage::from_rgba_unmultiplied(logo_size, logo_image.as_raw()), egui::TextureOptions::LINEAR);
         let (tx, rx) = mpsc::channel();
