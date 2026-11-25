@@ -85,6 +85,7 @@ enum WorkerMessage {
     Error(String),
     Launched,
     ServerStatus { address: String, online: bool, players_online: u32, players_max: u32 },
+    UpdateAvailable { version: String, url: String },
 }
 
 struct TensuraApp {
@@ -107,6 +108,7 @@ struct TensuraApp {
     new_server_players: String,
     new_server_capacity: String,
     new_instance_name: String,
+    update_available: Option<(String, String)>,
 }
 
 impl TensuraApp {
@@ -145,9 +147,12 @@ impl TensuraApp {
             new_server_players: "0".to_owned(),
             new_server_capacity: "20".to_owned(),
             new_instance_name: String::new(),
+            update_available: None,
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
+        let update_tx = app.tx.clone();
+        thread::spawn(move || check_for_updates(update_tx));
         app
     }
 
@@ -407,6 +412,10 @@ impl TensuraApp {
                 WorkerMessage::Launched => {
                     self.busy = false;
                     self.status("Minecraft started.");
+                }
+                WorkerMessage::UpdateAvailable { version, url } => {
+                    self.update_available = Some((version.clone(), url));
+                    self.status(format!("Tensura Launcher update {version} is available."));
                 }
                 WorkerMessage::ServerStatus { address, online, players_online, players_max } => {
                     if let Some(server) = self.settings.servers.iter_mut().find(|server| server.address == address) {
@@ -865,6 +874,9 @@ impl eframe::App for TensuraApp {
                     ui.label(RichText::new("TENSURA").size(16.0).strong().color(Color32::WHITE));
                     ui.label(RichText::new("LAUNCHER").size(9.0).strong().color(Color32::from_rgb(0, 211, 137)));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if let Some((version, url)) = self.update_available.clone() {
+                            if ui.button(format!("UPDATE {version}")).clicked() { let _ = open::that(url); }
+                        }
                         let name = self.account_name.as_deref().unwrap_or("Offline player");
                         egui::ComboBox::from_id_salt("account_menu")
                             .selected_text(RichText::new(name).size(11.0).color(Color32::WHITE))
@@ -886,6 +898,40 @@ impl eframe::App for TensuraApp {
                 Page::Settings => self.settings(ui, ctx),
             }
         });
+    }
+}
+
+
+fn version_is_newer(latest: &str, current: &str) -> bool {
+    let parse = |value: &str| -> Vec<u64> {
+        value.trim_start_matches('v').split('.')
+            .map(|part| part.split('-').next().unwrap_or("0").parse::<u64>().unwrap_or(0))
+            .collect()
+    };
+    let latest = parse(latest);
+    let current = parse(current);
+    for index in 0..latest.len().max(current.len()) {
+        let left = *latest.get(index).unwrap_or(&0);
+        let right = *current.get(index).unwrap_or(&0);
+        if left != right { return left > right; }
+    }
+    false
+}
+
+fn check_for_updates(tx: Sender<WorkerMessage>) {
+    let result = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("TensuraLauncher")
+        .build()
+        .and_then(|client| client.get("https://api.github.com/repos/dontcare-dev/tensura-launcher/releases/latest").send())
+        .and_then(|response| response.error_for_status())
+        .and_then(|response| response.json::<serde_json::Value>());
+    if let Ok(release) = result {
+        let version = release["tag_name"].as_str().unwrap_or_default().to_owned();
+        let url = release["html_url"].as_str().unwrap_or_default().to_owned();
+        if !version.is_empty() && !url.is_empty() && version_is_newer(&version, env!("CARGO_PKG_VERSION")) {
+            let _ = tx.send(WorkerMessage::UpdateAvailable { version, url });
+        }
     }
 }
 
