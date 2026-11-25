@@ -84,6 +84,7 @@ enum WorkerMessage {
     SearchResults(Vec<Project>),
     Error(String),
     Launched,
+    GameExited(Option<i32>),
     ServerStatus { address: String, online: bool, players_online: u32, players_max: u32 },
     UpdateAvailable { version: String, url: String },
 }
@@ -103,6 +104,7 @@ struct TensuraApp {
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
     installed: bool,
+    game_running: bool,
     new_server_name: String,
     new_server_address: String,
     new_server_players: String,
@@ -142,6 +144,7 @@ impl TensuraApp {
             tx,
             rx,
             installed: false,
+            game_running: false,
             new_server_name: String::new(),
             new_server_address: String::new(),
             new_server_players: "0".to_owned(),
@@ -283,7 +286,7 @@ impl TensuraApp {
     }
 
     fn start_game(&mut self) {
-        if self.busy { return; }
+        if self.busy || self.game_running { return; }
         let account = self.account.clone().unwrap_or_else(|| Account::offline(&self.settings.offline_username));
         if !self.installed {
             self.start_install();
@@ -324,11 +327,14 @@ impl TensuraApp {
                 let log = fs::File::create(log_dir.join("tensura-launcher.log")).map_err(|e| e.to_string())?;
                 command.stdout(Stdio::from(log.try_clone().map_err(|e| e.to_string())?))
                     .stderr(Stdio::from(log));
-                command.spawn().map_err(|e| format!("Minecraft could not start: {e}"))?;
+                let mut child = command.spawn().map_err(|e| format!("Minecraft could not start: {e}"))?;
+                let _ = tx.send(WorkerMessage::Launched);
+                let exit = child.wait().map_err(|e| format!("Could not monitor Minecraft process: {e}"))?;
+                let _ = tx.send(WorkerMessage::GameExited(exit.code()));
                 Ok(())
             })();
             match result {
-                Ok(()) => { let _ = tx.send(WorkerMessage::Launched); }
+                Ok(()) => {}
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
         });
@@ -411,7 +417,16 @@ impl TensuraApp {
                 }
                 WorkerMessage::Launched => {
                     self.busy = false;
-                    self.status("Minecraft started.");
+                    self.game_running = true;
+                    self.status("Minecraft is running. Launch log: game/logs/tensura-launcher.log");
+                }
+                WorkerMessage::GameExited(code) => {
+                    self.game_running = false;
+                    match code {
+                        Some(0) => self.status("Minecraft closed normally."),
+                        Some(code) => self.status(format!("Minecraft exited with code {code}. Check the launch log.")),
+                        None => self.status("Minecraft closed. Check the launch log for details."),
+                    }
                 }
                 WorkerMessage::UpdateAvailable { version, url } => {
                     self.update_available = Some((version.clone(), url));
