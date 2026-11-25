@@ -63,6 +63,8 @@ struct Settings {
     microsoft_client_id: String,
     ram_gb: u32,
     minecraft_version: String,
+    #[serde(default = "default_loader")]
+    loader: String,
     #[serde(default = "default_offline_username")]
     offline_username: String,
     #[serde(default)]
@@ -70,6 +72,7 @@ struct Settings {
 }
 
 fn default_offline_username() -> String { "TensuraPlayer".to_owned() }
+fn default_loader() -> String { "fabric".to_owned() }
 
 enum WorkerMessage {
     Status(String),
@@ -159,6 +162,7 @@ impl TensuraApp {
                 microsoft_client_id: String::new(),
                 ram_gb: 4,
                 minecraft_version: MC_VERSION.to_owned(),
+                loader: default_loader(),
                 offline_username: "TensuraPlayer".to_owned(),
                 servers: Vec::new(),
             })
@@ -218,7 +222,7 @@ impl TensuraApp {
     }
 
     fn profile_exists(&self) -> bool {
-        find_fabric_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version).is_some()
+        find_profile_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader).is_some()
     }
 
     fn status(&mut self, text: impl Into<String>) {
@@ -231,8 +235,9 @@ impl TensuraApp {
         self.status("Installing Tensura Client...");
         let tx = self.tx.clone();
         let version = self.settings.minecraft_version.clone();
+        let loader = self.settings.loader.clone();
         thread::spawn(move || {
-            let result = install_tensura(&version, &tx);
+            let result = install_tensura(&version, &loader, &tx);
             match result {
                 Ok(message) => { let _ = tx.send(WorkerMessage::Installed(message)); }
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
@@ -271,7 +276,7 @@ impl TensuraApp {
         self.busy = true;
         self.status("Starting Minecraft...");
         let tx = self.tx.clone();
-        let version_id = find_fabric_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version);
+        let version_id = find_profile_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader);
         let Some(version_id) = version_id else {
             self.busy = false;
             self.installed = false;
@@ -336,11 +341,12 @@ impl TensuraApp {
         if self.busy { return; }
         let kind = self.page.project_type().to_owned();
         let version = self.settings.minecraft_version.clone();
+        let loader = self.settings.loader.clone();
         self.busy = true;
         self.status(format!("Installing {}...", project.title));
         let tx = self.tx.clone();
         thread::spawn(move || {
-            match download_modrinth_project(&project.slug, &kind, &version, &TensuraApp::game_dir()) {
+            match download_modrinth_project(&project.slug, &kind, &version, &loader, &TensuraApp::game_dir()) {
                 Ok(path) => { let _ = tx.send(WorkerMessage::Installed(format!("Installed to {}", path.display()))); }
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
@@ -717,6 +723,14 @@ impl TensuraApp {
                 if !self.installed { self.start_install(); }
             }
             ui.horizontal(|ui| {
+                ui.label("Mod loader");
+                egui::ComboBox::from_id_salt("mod_loader").selected_text(self.settings.loader.to_uppercase()).show_ui(ui, |ui| {
+                    for loader in ["fabric", "quilt", "forge", "neoforge"] {
+                        ui.selectable_value(&mut self.settings.loader, loader.to_owned(), loader.to_uppercase());
+                    }
+                });
+            });
+            ui.horizontal(|ui| {
                 ui.label("Memory");
                 ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
             });
@@ -808,11 +822,18 @@ impl eframe::App for TensuraApp {
     }
 }
 
-fn find_fabric_version_id(root: &Path, mc_version: &str) -> Option<String> {
+fn find_profile_version_id(root: &Path, mc_version: &str, loader: &str) -> Option<String> {
     let entries = fs::read_dir(root.join("versions")).ok()?;
     entries.flatten().find_map(|entry| {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with("fabric-loader-") && name.ends_with(&format!("-{}", mc_version)) { Some(name) } else { None }
+        let matches = match loader {
+            "fabric" => name.starts_with("fabric-loader-") && name.ends_with(&format!("-{mc_version}")),
+            "quilt" => name.starts_with("quilt-loader-") && name.ends_with(&format!("-{mc_version}")),
+            "forge" => name.starts_with(&format!("{mc_version}-forge-")),
+            "neoforge" => name.starts_with(&format!("{mc_version}-neoforge-")),
+            _ => false,
+        };
+        matches.then_some(name)
     })
 }
 
@@ -880,40 +901,55 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
     Err("Install Java 21 or newer and make java available on PATH.".to_owned())
 }
 
-fn install_tensura(version: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
+fn install_tensura(version: &str, loader: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
     fs::create_dir_all(TensuraApp::game_dir()).map_err(|e| e.to_string())?;
     for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
         fs::create_dir_all(TensuraApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
     }
-    let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {} + Fabric...", version)));
+    let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {version} + {loader}...")));
     let launcher = Launcher::new(TensuraApp::minecraft_dir());
+    let loader_spec = match loader {
+        "fabric" => Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
+        "quilt" => Some(LoaderSpec::Quilt { version: LoaderVersion::Latest }),
+        "forge" => Some(LoaderSpec::Forge { version: LoaderVersion::Latest }),
+        "neoforge" => Some(LoaderSpec::NeoForge { version: LoaderVersion::Latest }),
+        _ => return Err(format!("Unsupported mod loader: {loader}")),
+    };
+    if matches!(loader, "forge" | "neoforge") {
+        let java = ensure_java()?;
+        if let Some(parent) = java.parent() {
+            let mut paths = vec![parent.to_path_buf()];
+            paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+            if let Ok(path) = std::env::join_paths(paths) { std::env::set_var("PATH", path); }
+        }
+    }
     let install = launcher.install(InstallRequest {
         minecraft_version: version.to_owned(),
-        loader: Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
+        loader: loader_spec,
         java: JavaInstallPolicy::Auto,
     }).map_err(|e| e.to_string())?;
-    let _ = tx.send(WorkerMessage::Status("Installing performance mods...".to_owned()));
+    let _ = tx.send(WorkerMessage::Status("Installing compatible performance mods...".to_owned()));
     let mut installed = Vec::new();
     let mut skipped = Vec::new();
-    for slug in PERF_MODS {
-        match download_modrinth_project(slug, "mod", version, &TensuraApp::game_dir()) {
+    for slug in if loader == "fabric" { PERF_MODS } else { &[] } {
+        match download_modrinth_project(slug, "mod", version, loader, &TensuraApp::game_dir()) {
             Ok(_) => installed.push(*slug),
             Err(_) => skipped.push(*slug),
         }
     }
-    let shader = download_modrinth_project("complementary-reimagined", "shader", version, &TensuraApp::game_dir());
+    let shader = download_modrinth_project("complementary-reimagined", "shader", version, loader, &TensuraApp::game_dir());
     let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
     let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
         install.version_id, installed.len(), skipped.len(), version, shader_status, TensuraApp::instance_dir().display());
     Ok(report)
 }
 
-fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, game_dir: &Path) -> std::result::Result<PathBuf, String> {
+fn download_modrinth_project(slug: &str, kind: &str, mc_version: &str, loader: &str, game_dir: &Path) -> std::result::Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90))
         .user_agent("TensuraLauncher/0.2").build().map_err(|e| e.to_string())?;
     let mut request = client.get(format!("https://api.modrinth.com/v2/project/{}/version", slug))
         .query(&[("game_versions", format!("[\"{}\"]", mc_version))]);
-    if kind == "mod" { request = request.query(&[("loaders", "[\"fabric\"]")]); }
+    if kind == "mod" { request = request.query(&[("loaders", format!("[\"{}\"]", loader))]); }
     let versions: Vec<serde_json::Value> = request.send().map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
         .json().map_err(|e| e.to_string())?;
     let file = versions.iter().find_map(|v| {
