@@ -609,17 +609,20 @@ impl TensuraApp {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { if ui.small_button("↻").clicked() { for server in self.settings.servers.clone() { request_server_status(self.tx.clone(), server.address); } } });
                     });
                     ui.add_space(5.0);
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_name).hint_text("Server name").desired_width(f32::INFINITY));
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Server address").desired_width(f32::INFINITY));
-                    if ui.add_sized([ui.available_width(), 29.0], egui::Button::new(RichText::new("＋  ADD SERVER").strong().color(accent)).fill(Color32::from_rgba_unmultiplied(34, 69, 108, 170)).stroke(egui::Stroke::new(1.0_f32, edge))).clicked() {
-                        let name = self.new_server_name.trim().to_owned();
-                        let address = self.new_server_address.trim().to_owned();
-                        if !name.is_empty() && !address.is_empty() && !address.contains(' ') && !self.settings.servers.iter().any(|server| server.address.eq_ignore_ascii_case(&address)) {
-                            self.settings.servers.push(CustomServer { name, address: address.clone(), players_online: 0, players_max: 0, online: false });
-                            self.save_settings(); request_server_status(self.tx.clone(), address);
-                            self.new_server_name.clear(); self.new_server_address.clear();
+                    ui.horizontal(|ui| {
+                        let field_width = (ui.available_width() - 42.0).max(120.0);
+                        ui.add_sized([field_width, 36.0], egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Add server address..."));
+                        let add = ui.add_sized([36.0, 36.0], egui::Button::new(RichText::new("➜").size(16.0).strong().color(accent)).fill(Color32::from_rgba_unmultiplied(34, 69, 108, 190)).stroke(egui::Stroke::new(1.0_f32, edge)));
+                        if add.clicked() {
+                            let address = self.new_server_address.trim().to_owned();
+                            let name = address.split(':').next().unwrap_or(&address).to_owned();
+                            if !address.is_empty() && !address.contains(' ') && !self.settings.servers.iter().any(|server| server.address.eq_ignore_ascii_case(&address)) {
+                                self.settings.servers.push(CustomServer { name, address: address.clone(), players_online: 0, players_max: 0, online: false });
+                                self.save_settings(); request_server_status(self.tx.clone(), address);
+                                self.new_server_address.clear();
+                            }
                         }
-                    }
+                    });
                     for server in self.settings.servers.iter().take(3) {
                         ui.add_space(5.0);
                         ui.horizontal(|ui| {
