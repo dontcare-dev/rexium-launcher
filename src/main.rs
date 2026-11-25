@@ -527,7 +527,7 @@ impl TensuraApp {
                 ui.add_space(18.0);
                 let hero_height = (ui.available_height() * 0.56).clamp(275.0, 390.0);
                 let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
-                ui.scope_builder(egui::UiBuilder::new().max_rect(hero), |ui| { egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0, border)).corner_radius(18.0).show(ui, |ui| {
+                ui.scope_builder(egui::UiBuilder::new().max_rect(hero), |ui| { egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0_f32, border)).corner_radius(18.0).show(ui, |ui| {
                     ui.set_min_size(hero.size());
                     let rect = ui.min_rect();
                     if !self.background_frames.is_empty() {
@@ -562,7 +562,7 @@ impl TensuraApp {
                         ("SHADERS","Lighting & effects",Page::Shaderpacks,"✦"),
                         ("SETTINGS","Tune your client",Page::Settings,"⚙"),
                     ] {
-                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,border)).corner_radius(11.0).inner_margin(10.0).show(ui,|ui|{
+                        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, border)).corner_radius(11.0).inner_margin(10.0).show(ui,|ui|{
                             ui.set_min_width(tile_width-20.0);
                             if ui.add(egui::Button::new(RichText::new(glyph).size(20.0).color(accent)).frame(false)).clicked(){self.page=page;self.results.clear();}
                             ui.label(RichText::new(name).size(9.0).strong().color(Color32::WHITE));
@@ -571,7 +571,7 @@ impl TensuraApp {
                     }
                 });
                 ui.add_space(14.0);
-                egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,border)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
+                egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, border)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
                     ui.horizontal(|ui|{
                         ui.label(RichText::new("ACTIVE INSTANCE").size(9.0).strong().color(muted));
                         ui.add_space(8.0);
@@ -585,12 +585,12 @@ impl TensuraApp {
             });
             ui.add_space(gap);
             ui.allocate_ui_with_layout(Vec2::new(rail,ui.available_height()),egui::Layout::top_down(egui::Align::Min),|ui|{
-                egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,border)).corner_radius(14.0).inner_margin(15.0).show(ui,|ui|{
+                egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, border)).corner_radius(14.0).inner_margin(15.0).show(ui,|ui|{
                     ui.label(RichText::new("COMMUNITY").size(10.0).strong().color(muted));
                     ui.add_space(10.0);
-                    if ui.add(egui::Button::new("◈   Discord support     ↗").fill(Color32::from_rgb(24,36,57)).stroke(egui::Stroke::new(1.0,border)).min_size(Vec2::new(ui.available_width(),38.0))).clicked(){let _=open::that("https://discord.gg/BCWaT9PVhh");}
+                    if ui.add(egui::Button::new("◈   Discord support     ↗").fill(Color32::from_rgb(24,36,57)).stroke(egui::Stroke::new(1.0_f32, border)).min_size(Vec2::new(ui.available_width(),38.0))).clicked(){let _=open::that("https://discord.gg/BCWaT9PVhh");}
                     ui.add_space(7.0);
-                    if ui.add(egui::Button::new("◇   Browse Modrinth     ↗").fill(Color32::from_rgb(24,36,57)).stroke(egui::Stroke::new(1.0,border)).min_size(Vec2::new(ui.available_width(),38.0))).clicked(){let _=open::that("https://modrinth.com");}
+                    if ui.add(egui::Button::new("◇   Browse Modrinth     ↗").fill(Color32::from_rgb(24,36,57)).stroke(egui::Stroke::new(1.0_f32, border)).min_size(Vec2::new(ui.available_width(),38.0))).clicked(){let _=open::that("https://modrinth.com");}
                     ui.add_space(20.0);
                     ui.horizontal(|ui|{
                         ui.label(RichText::new("YOUR SERVERS").size(10.0).strong().color(muted));
@@ -673,7 +673,7 @@ impl TensuraApp {
                 let mut remove=None;
                 egui::ScrollArea::vertical().show(ui,|ui|{
                     for path in &files {
-                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0,line)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
+                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
                             ui.horizontal(|ui|{
                                 ui.label(RichText::new(match folder{"mods"=>"◈","resourcepacks"=>"▧",_=>"✧"}).size(25.0).color(accent));
                                 ui.vertical(|ui|{
@@ -705,7 +705,7 @@ impl TensuraApp {
                 else if self.results.is_empty(){ui.vertical_centered(|ui|{ui.add_space(42.0);ui.label(RichText::new("Find something new").size(19.0).strong().color(Color32::WHITE));ui.label(RichText::new("Search the Modrinth catalogue to add content to this instance.").size(11.0).color(muted));});}
                 egui::ScrollArea::vertical().show(ui,|ui|{
                     for project in self.results.clone(){
-                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0,line)).corner_radius(11.0).inner_margin(12.0).show(ui,|ui|{
+                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(11.0).inner_margin(12.0).show(ui,|ui|{
                             ui.horizontal(|ui|{
                                 let artwork=if project.icon_url.is_empty(){egui::Image::new(egui::include_image!("../assets/tensura-mark.svg"))}else{egui::Image::from_uri(project.icon_url.clone())};
                                 ui.add(artwork.fit_to_exact_size(Vec2::splat(58.0)));
@@ -735,7 +735,7 @@ impl TensuraApp {
         ui.label(RichText::new("Configure your launcher, game instance and account.").size(11.0).color(muted));
         ui.add_space(16.0);
         egui::ScrollArea::vertical().show(ui,|ui|{
-            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
                 ui.label(RichText::new("GAME INSTANCE").size(11.0).strong().color(accent));
                 ui.add_space(10.0);
                 let mut available_instances:Vec<String>=fs::read_dir(Self::data_dir().join("instances")).ok().into_iter().flat_map(|x|x.flatten()).filter(|x|x.path().is_dir()).map(|x|x.file_name().to_string_lossy().to_string()).collect();
@@ -767,7 +767,7 @@ impl TensuraApp {
                 ui.label(RichText::new("Changing version or loader installs the matching profile when needed.").size(9.0).color(muted));
             });
             ui.add_space(10.0);
-            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
                 ui.label(RichText::new("ACCOUNT").size(11.0).strong().color(accent));
                 ui.add_space(8.0);
                 ui.label(RichText::new("Offline username").color(muted));
@@ -779,7 +779,7 @@ impl TensuraApp {
                 ui.label(RichText::new("Used only for Microsoft device-code sign-in.").size(9.0).color(muted));
             });
             ui.add_space(10.0);
-            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
                 ui.label(RichText::new("APPEARANCE").size(11.0).strong().color(accent));
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui|{
@@ -790,7 +790,7 @@ impl TensuraApp {
                 ui.horizontal(|ui|{ui.label(RichText::new("Accent colour").color(muted));ui.add(egui::Slider::new(&mut self.settings.accent_hue,0.0..=1.0).show_value(false));});
             });
             ui.add_space(10.0);
-            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
                 ui.label(RichText::new("MAINTENANCE").size(11.0).strong().color(accent));
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui|{
