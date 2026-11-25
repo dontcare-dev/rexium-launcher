@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -305,7 +305,7 @@ impl TensuraApp {
                 let options = LaunchOptions {
                     account,
                     java_executable: Some(java),
-                    game_directory: Some(game_dir),
+                    game_directory: Some(game_dir.clone()),
                     launcher_name: "Tensura".to_owned(),
                     launcher_version: env!("CARGO_PKG_VERSION").to_owned(),
                     ..Default::default()
@@ -314,6 +314,11 @@ impl TensuraApp {
                 let mut command = Command::new(&launch.executable);
                 command.arg("-Xms1G").arg(format!("-Xmx{}G", ram))
                     .args(&launch.args).current_dir(&launch.working_dir).envs(launch.env);
+                let log_dir = game_dir.join("logs");
+                fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+                let log = fs::File::create(log_dir.join("tensura-launcher.log")).map_err(|e| e.to_string())?;
+                command.stdout(Stdio::from(log.try_clone().map_err(|e| e.to_string())?))
+                    .stderr(Stdio::from(log));
                 command.spawn().map_err(|e| format!("Minecraft could not start: {e}"))?;
                 Ok(())
             })();
@@ -824,6 +829,7 @@ impl TensuraApp {
                 }
                 if ui.button("Open game folder ↗").clicked() { let _ = open::that(self.current_game_dir()); }
                 if ui.button("Open instance folder ↗").clicked() { let _ = open::that(self.current_instance_dir()); }
+                if ui.button("Open launch logs ↗").clicked() { let _ = open::that(self.current_game_dir().join("logs")); }
             });
             if ui.button("Save settings").clicked() {
                 let username = self.settings.offline_username.trim().to_owned();
@@ -994,11 +1000,17 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
             if let Ok(path) = std::env::join_paths(paths) { std::env::set_var("PATH", path); }
         }
     }
-    let install = launcher.install(InstallRequest {
+    let install_request = InstallRequest {
         minecraft_version: version.to_owned(),
         loader: loader_spec,
         java: JavaInstallPolicy::Auto,
-    }).map_err(|e| e.to_string())?;
+    };
+    let progress_tx = tx.clone();
+    let mut reporter = |event: mc_launcher_core::progress::ProgressEvent| {
+        let _ = progress_tx.send(WorkerMessage::Status(format!("{event:?}")));
+    };
+    let install = launcher.install_with_progress(install_request, &mut reporter)
+        .map_err(|e| e.to_string())?;
     let _ = tx.send(WorkerMessage::Status("Installing compatible performance mods...".to_owned()));
     let mut installed = Vec::new();
     let mut skipped = Vec::new();
