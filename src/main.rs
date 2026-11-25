@@ -632,7 +632,7 @@ impl TensuraApp {
                     ui.separator();
                     ui.add_space(10.0);
                     ui.label(RichText::new("LAUNCHER STATUS").size(9.0).strong().color(muted));
-                    let status_text=if self.status.len()>180{format!("{}…",&self.status[..self.status.floor_char_boundary(180)])}else{self.status.clone()};
+                    let status_text=if self.status.len()>180{format!("{}…",self.status.chars().take(180).collect::<String>())}else{self.status.clone()};
                     ui.label(RichText::new(status_text).size(10.0).color(if self.status.to_lowercase().contains("error")||self.status.to_lowercase().contains("failed"){Color32::from_rgb(255,151,151)}else{Color32::from_rgb(181,203,214)}));
                 });
             });
