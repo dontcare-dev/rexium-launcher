@@ -1091,3 +1091,37 @@ fn main() -> eframe::Result<()> {
     };
     eframe::run_native("Tensura Launcher", options, Box::new(|cc| Ok(Box::new(TensuraApp::new(cc)))))
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn instance_names_are_path_safe() {
+        assert_eq!(sanitize_instance_name("../World?"), "World");
+        assert_eq!(sanitize_instance_name("  "), "Tensura Client");
+        assert_eq!(sanitize_instance_name("My Survival_01"), "My Survival_01");
+    }
+
+    #[test]
+    fn finds_each_supported_loader_profile() {
+        let root = std::env::temp_dir().join(format!("tensura-test-{}", std::process::id()));
+        let versions = root.join("versions");
+        fs::create_dir_all(&versions).unwrap();
+        for name in [
+            "fabric-loader-0.16.9-1.21.1",
+            "quilt-loader-0.29.1-1.21.1",
+            "1.21.1-forge-52.0.16",
+            "1.21.1-neoforge-21.1.1",
+        ] {
+            fs::create_dir_all(versions.join(name)).unwrap();
+        }
+        assert!(find_profile_version_id(&root, "1.21.1", "fabric").is_some());
+        assert!(find_profile_version_id(&root, "1.21.1", "quilt").is_some());
+        assert!(find_profile_version_id(&root, "1.21.1", "forge").is_some());
+        assert!(find_profile_version_id(&root, "1.21.1", "neoforge").is_some());
+        assert!(find_profile_version_id(&root, "1.20.1", "fabric").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+}
