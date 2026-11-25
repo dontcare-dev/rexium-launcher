@@ -545,7 +545,7 @@ impl TensuraApp {
                     let play = egui::Rect::from_min_size(rect.left_bottom()-egui::vec2(-28.0,64.0), Vec2::new(196.0,42.0));
                     let label = if self.game_running { "MINECRAFT IS RUNNING" } else if self.busy { "PREPARING CLIENT..." } else if self.installed { "▶    PLAY NOW" } else { "INSTALL CLIENT" };
                     painter.rect_filled(play, 8.0, if self.busy { Color32::from_rgb(87,115,126) } else { accent });
-                    painter.text(play.center(), egui::Align2::CENTER_CENTER, label, egui::FontId::proportional(12.0).strong(), Color32::from_rgb(5,24,28));
+                    painter.text(play.center(), egui::Align2::CENTER_CENTER, label, egui::FontId::proportional(12.0), Color32::from_rgb(5,24,28));
                     if ui.interact(play, ui.id().with("tensura_play"), egui::Sense::click()).clicked() && !self.busy && !self.game_running {
                         if self.installed { self.start_game(); } else { self.start_install(); }
                     }
@@ -1033,7 +1033,7 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
         java: JavaInstallPolicy::Auto,
     };
     let progress_tx = tx.clone();
-    let mut reporter = |event: mc_launcher_core::progress::ProgressEvent| {
+    let mut reporter = |_event: mc_launcher_core::progress::ProgressEvent| {
         let _ = progress_tx.send(WorkerMessage::Status("Downloading and preparing Minecraft files…".to_owned()));
     };
     let install = launcher.install_with_progress(install_request, &mut reporter)
