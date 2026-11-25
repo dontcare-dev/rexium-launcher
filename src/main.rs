@@ -85,6 +85,7 @@ struct TensuraApp {
     page: Page,
     query: String,
     results: Vec<Project>,
+    show_installed: bool,
     status: String,
     busy: bool,
     settings: Settings,
@@ -120,6 +121,7 @@ impl TensuraApp {
             page: Page::Home,
             query: String::new(),
             results: Vec::new(),
+            show_installed: false,
             status: "Ready".to_owned(),
             busy: false,
             settings,
@@ -583,16 +585,91 @@ impl TensuraApp {
 
     fn browser(&mut self, ui: &mut egui::Ui) {
         let title = match self.page { Page::Mods => "Mods", Page::ResourcePacks => "Resource packs", _ => "Shaders" };
-        ui.label(RichText::new(title).size(25.0).strong().color(Color32::WHITE));
-        ui.label(RichText::new("Modrinth library").size(12.0).color(Color32::from_gray(150)));
+        let folder = match self.page {
+            Page::Mods => "mods",
+            Page::ResourcePacks => "resourcepacks",
+            Page::Shaderpacks => "shaderpacks",
+            _ => return,
+        };
+        let directory = Self::game_dir().join(folder);
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new(title).size(25.0).strong().color(Color32::WHITE));
+                ui.label(RichText::new("Discover and manage your Tensura installation").size(12.0).color(Color32::from_gray(150)));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Open folder ↗").clicked() {
+                    let _ = open::that(&directory);
+                }
+                if ui.selectable_label(self.show_installed, "Installed").clicked() {
+                    self.show_installed = true;
+                    self.results.clear();
+                }
+                if ui.selectable_label(!self.show_installed, "Discover").clicked() {
+                    self.show_installed = false;
+                }
+            });
+        });
         ui.add_space(14.0);
+        if self.show_installed {
+            let mut files: Vec<PathBuf> = fs::read_dir(&directory).ok()
+                .into_iter().flat_map(|entries| entries.flatten())
+                .map(|entry| entry.path()).filter(|path| path.is_file()).collect();
+            files.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
+            ui.label(RichText::new(format!("{} installed files", files.len())).size(11.0).color(Color32::from_rgb(112, 211, 184)));
+            ui.add_space(8.0);
+            if files.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(45.0);
+                    ui.label(RichText::new("Nothing installed here yet").size(17.0).strong().color(Color32::WHITE));
+                    ui.label(RichText::new("Browse Modrinth to add something to this folder.").size(12.0).color(Color32::from_gray(150)));
+                });
+            }
+            let mut remove_file: Option<PathBuf> = None;
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for path in &files {
+                    egui::Frame::new().fill(Color32::from_rgb(13, 22, 31))
+                        .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(30, 48, 61)))
+                        .corner_radius(9.0).inner_margin(12.0).show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("▣").size(23.0).color(Color32::from_rgb(84, 210, 177)));
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new(path.file_name().unwrap_or_default().to_string_lossy()).size(13.0).strong().color(Color32::WHITE));
+                                    let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+                                    ui.label(RichText::new(format!("{:.1} MB", size as f64 / 1_048_576.0)).size(10.0).color(Color32::from_gray(145)));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.add(egui::Button::new(RichText::new("REMOVE").size(10.0).strong()).fill(Color32::from_rgb(104, 39, 51))).clicked() {
+                                        remove_file = Some(path.clone());
+                                    }
+                                });
+                            });
+                        });
+                    ui.add_space(6.0);
+                }
+            });
+            if let Some(path) = remove_file {
+                match fs::remove_file(&path) {
+                    Ok(()) => self.status(format!("Removed {}", path.file_name().unwrap_or_default().to_string_lossy())),
+                    Err(error) => self.status(format!("Could not remove file: {error}")),
+                }
+            }
+            return;
+        }
         ui.horizontal(|ui| {
             let width = (ui.available_width() - 110.0).max(120.0);
-            let field = ui.add_sized([width, 38.0], egui::TextEdit::singleline(&mut self.query).hint_text("Search..."));
+            let field = ui.add_sized([width, 38.0], egui::TextEdit::singleline(&mut self.query).hint_text("Search Modrinth..."));
             if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) { self.search(); }
             if ui.add_sized([100.0, 38.0], egui::Button::new("Search").fill(self.accent())).clicked() { self.search(); }
         });
         ui.add_space(12.0);
+        if self.results.is_empty() && !self.busy {
+            ui.vertical_centered(|ui| {
+                ui.add_space(35.0);
+                ui.label(RichText::new("Find your next upgrade").size(18.0).strong().color(Color32::WHITE));
+                ui.label(RichText::new("Search Modrinth for compatible projects and install them directly.").size(12.0).color(Color32::from_gray(150)));
+            });
+        }
         egui::ScrollArea::vertical().show(ui, |ui| {
             for project in self.results.clone() {
                 egui::Frame::new().fill(Color32::from_rgb(13, 22, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(30, 48, 61))).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
