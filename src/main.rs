@@ -330,15 +330,23 @@ impl TensuraApp {
         self.busy = true;
         self.status("Searching Modrinth...");
         let query = self.query.trim().to_owned();
+        let version = self.settings.minecraft_version.clone();
+        let loader = self.settings.loader.clone();
         let tx = self.tx.clone();
         thread::spawn(move || {
+            let mut facets = vec![
+                vec![format!("project_type:{kind}")],
+                vec![format!("versions:{version}")],
+            ];
+            if kind == "mod" { facets.push(vec![format!("categories:{loader}")]); }
+            let facets = serde_json::to_string(&facets).unwrap_or_default();
             let client = reqwest::blocking::Client::builder()
                 .timeout(Duration::from_secs(20))
                 .user_agent("TensuraLauncher/0.2")
                 .build();
             let result = client.map_err(|e| e.to_string()).and_then(|client| {
                 client.get("https://api.modrinth.com/v2/search")
-                    .query(&[("query", query.as_str()), ("facets", &format!("[[\"project_type:{}\"]]", kind)), ("limit", "30")])
+                    .query(&[("query", query.as_str()), ("facets", facets.as_str()), ("limit", "30")])
                     .send().map_err(|e| e.to_string())?
                     .error_for_status().map_err(|e| e.to_string())?
                     .json::<SearchResponse>().map_err(|e| e.to_string())
@@ -1002,7 +1010,7 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
     }
     let shader = download_modrinth_project("complementary-reimagined", "shader", version, loader, &game_dir);
     let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
-    let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
+    let report = format!("Instance installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
         install.version_id, installed.len(), skipped.len(), version, shader_status, instance_dir.display());
     Ok(report)
 }
