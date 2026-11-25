@@ -1,4 +1,5 @@
 use eframe::egui;
+use base64::Engine;
 use egui::{Color32, RichText, Vec2};
 use mc_launcher_core::prelude::*;
 use mc_launcher_core::{account::Account, auth::microsoft_account};
@@ -101,6 +102,7 @@ struct TensuraApp {
     account: Option<Account>,
     account_name: Option<String>,
     background_frames: Vec<(egui::TextureHandle, Duration)>,
+    mascot_texture: egui::TextureHandle,
     background_started: Instant,
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
@@ -128,6 +130,10 @@ impl TensuraApp {
         let settings = Self::load_settings();
         let initial_offline_name = settings.offline_username.clone();
         let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
+        let mascot_bytes = base64::engine::general_purpose::STANDARD.decode(include_str!("../assets/tensura-mascot.b64").trim()).expect("embedded Tensura mascot base64");
+        let mascot_image = image::load_from_memory(&mascot_bytes).expect("embedded Tensura mascot image").to_rgba8();
+        let mascot_size = [mascot_image.width() as usize, mascot_image.height() as usize];
+        let mascot_texture = cc.egui_ctx.load_texture("tensura-user-mascot", egui::ColorImage::from_rgba_unmultiplied(mascot_size, &mascot_image.into_raw()), egui::TextureOptions::LINEAR);
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             page: Page::Home,
@@ -140,6 +146,7 @@ impl TensuraApp {
             account: Some(Account::offline(&initial_offline_name)),
             account_name: Some(format!("{initial_offline_name} (offline)")),
             background_frames,
+            mascot_texture,
             background_started: Instant::now(),
             tx,
             rx,
