@@ -847,8 +847,8 @@ impl eframe::App for TensuraApp {
             .frame(egui::Frame::new().fill(Color32::from_rgb(8, 15, 34)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(120, 160, 255, 55))).inner_margin(egui::Margin::symmetric(26, 0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.label(RichText::new("◕  TENSURA").size(18.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("LAUNCHER").size(11.0).strong().color(Color32::from_rgb(0, 211, 137)));
+                    ui.add(egui::Image::new(&self.mascot_texture).fit_to_exact_size(Vec2::splat(30.0)));
+                    ui.label(RichText::new("TENSURA LAUNCHER").size(17.0).strong().color(Color32::WHITE));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if let Some((version, url)) = self.update_available.clone() {
                             if ui.button(format!("UPDATE {version}")).clicked() { let _ = open::that(url); }
