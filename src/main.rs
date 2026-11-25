@@ -500,7 +500,7 @@ impl TensuraApp {
     }
 
     fn home(&mut self, ui: &mut egui::Ui) {
-        let accent = Color32::from_rgb(47, 224, 177);
+        let accent = self.accent();
         let muted = Color32::from_rgb(145, 163, 180);
         let panel = Color32::from_rgb(13, 22, 35);
         let border = Color32::from_rgb(31, 48, 68);
@@ -640,7 +640,7 @@ impl TensuraApp {
     }
 
     fn browser(&mut self, ui: &mut egui::Ui) {
-        let accent=Color32::from_rgb(52,224,183);
+        let accent=self.accent();
         let muted=Color32::from_rgb(142,160,177);
         let panel=Color32::from_rgb(13,22,35);
         let line=Color32::from_rgb(31,48,67);
