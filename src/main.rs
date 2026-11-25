@@ -774,6 +774,21 @@ impl TensuraApp {
                         ui.selectable_value(&mut selected_instance, name.clone(), name);
                     }
                 });
+            let mut delete_instance: Option<String> = None;
+            for name in &available_instances {
+                if name != &self.settings.instance_name {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(name).size(11.0).color(Color32::from_gray(170)));
+                        if ui.small_button("Delete").clicked() { delete_instance = Some(name.clone()); }
+                    });
+                }
+            }
+            if let Some(name) = delete_instance {
+                match fs::remove_dir_all(Self::instance_dir_for(&name)) {
+                    Ok(()) => self.status(format!("Deleted instance {name} and its local game data.")),
+                    Err(error) => self.status(format!("Could not delete instance {name}: {error}")),
+                }
+            }
             if selected_instance != self.settings.instance_name {
                 self.settings.instance_name = selected_instance;
                 self.save_settings();
