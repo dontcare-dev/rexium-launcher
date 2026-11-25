@@ -594,6 +594,13 @@ impl TensuraApp {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| { ui.label(RichText::new(format!("{}", self.settings.servers.len())).size(10.0).color(muted)); });
                 });
                 ui.add_space(10.0);
+                if ui.small_button("↻ Refresh all server statuses").clicked() {
+                    for server in self.settings.servers.clone() {
+                        request_server_status(self.tx.clone(), server.address);
+                    }
+                    self.status("Refreshing server statuses...");
+                }
+                ui.add_space(6.0);
                 ui.add(egui::TextEdit::singleline(&mut self.new_server_name).hint_text("Server name").desired_width(f32::INFINITY));
                 ui.add_space(5.0);
                 ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Server address").desired_width(f32::INFINITY));
