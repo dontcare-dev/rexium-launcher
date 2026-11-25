@@ -176,7 +176,7 @@ impl TensuraApp {
         fs::read(Self::settings_path()).ok()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or_else(|| Settings {
-                accent_hue: 0.36,
+                accent_hue: 0.46,
                 background_path: String::new(),
                 microsoft_client_id: String::new(),
                 ram_gb: 4,
