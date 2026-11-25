@@ -460,10 +460,9 @@ impl TensuraApp {
         egui::SidePanel::left("tensura_sidebar")
             .exact_width(104.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(110, 157, 255, 42))).inner_margin(egui::Margin::symmetric(24, 16)))
+            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(110, 157, 255, 42))).inner_margin(egui::Margin::symmetric(14, 16)))
             .show(ctx, |ui| {
-                let mark = egui::Image::from_bytes("bytes://tensura-mark.svg", include_bytes!("../assets/tensura-mark.svg"));
-                ui.add_sized(Vec2::splat(44.0), mark);
+                ui.add(egui::Image::new(&self.mascot_texture).fit_to_exact_size(Vec2::splat(48.0)));
                 ui.add_space(34.0);
                 for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
                     let selected = self.page == page;
