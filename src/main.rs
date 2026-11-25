@@ -527,7 +527,7 @@ impl TensuraApp {
                 ui.add_space(18.0);
                 let hero_height = (ui.available_height() * 0.56).clamp(275.0, 390.0);
                 let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
-                ui.allocate_ui_at_rect(hero, |ui| { egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0, border)).corner_radius(18.0).show(ui, |ui| {
+                ui.scope_builder(egui::UiBuilder::new().max_rect(hero), |ui| { egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0, border)).corner_radius(18.0).show(ui, |ui| {
                     ui.set_min_size(hero.size());
                     let rect = ui.min_rect();
                     if !self.background_frames.is_empty() {
@@ -660,7 +660,7 @@ impl TensuraApp {
             });
         });
         ui.add_space(18.0);
-        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(14.0).show(ui,|ui|{
+        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0_f32,line)).corner_radius(13.0).inner_margin(14.0).show(ui,|ui|{
             if self.show_installed {
                 let mut files:Vec<PathBuf>=fs::read_dir(&directory).ok().into_iter().flat_map(|x|x.flatten()).map(|x|x.path()).filter(|x|x.is_file()).collect();
                 files.sort_by_key(|p|p.file_name().map(|x|x.to_string_lossy().to_lowercase()).unwrap_or_default());
