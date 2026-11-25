@@ -118,6 +118,7 @@ impl TensuraApp {
         style.spacing.item_spacing = Vec2::new(10.0, 10.0);
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
+        let initial_offline_name = settings.offline_username.clone();
         let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
@@ -128,8 +129,8 @@ impl TensuraApp {
             status: "Ready".to_owned(),
             busy: false,
             settings,
-            account: Some(Account::offline("TensuraPlayer")),
-            account_name: Some("TensuraPlayer (offline)".to_owned()),
+            account: Some(Account::offline(&initial_offline_name)),
+            account_name: Some(format!("{initial_offline_name} (offline)")),
             background_frames,
             background_started: Instant::now(),
             tx,
@@ -722,6 +723,7 @@ impl TensuraApp {
                 self.save_settings();
                 if !self.installed { self.start_install(); }
             }
+            let previous_loader = self.settings.loader.clone();
             ui.horizontal(|ui| {
                 ui.label("Mod loader");
                 egui::ComboBox::from_id_salt("mod_loader").selected_text(self.settings.loader.to_uppercase()).show_ui(ui, |ui| {
@@ -730,6 +732,11 @@ impl TensuraApp {
                     }
                 });
             });
+            if self.settings.loader != previous_loader {
+                self.installed = self.profile_exists();
+                self.save_settings();
+                if !self.installed { self.start_install(); }
+            }
             ui.horizontal(|ui| {
                 ui.label("Memory");
                 ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
@@ -767,7 +774,7 @@ impl TensuraApp {
             if ui.button("Save settings").clicked() {
                 let username = self.settings.offline_username.trim().to_owned();
                 if !username.is_empty() {
-                    self.settings.offline_username = username.chars().take(16).collect();
+                    self.settings.offline_username = username.chars().filter(|ch| ch.is_ascii_alphanumeric() || *ch == char::from(95)).take(16).collect();
                     if self.account_name.as_deref().is_some_and(|name| name.ends_with("(offline)")) {
                         self.account = Some(Account::offline(&self.settings.offline_username));
                         self.account_name = Some(format!("{} (offline)", self.settings.offline_username));
