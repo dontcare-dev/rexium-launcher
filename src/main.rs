@@ -65,6 +65,8 @@ struct Settings {
     minecraft_version: String,
     #[serde(default = "default_loader")]
     loader: String,
+    #[serde(default = "default_instance_name")]
+    instance_name: String,
     #[serde(default = "default_offline_username")]
     offline_username: String,
     #[serde(default)]
@@ -73,6 +75,7 @@ struct Settings {
 
 fn default_offline_username() -> String { "TensuraPlayer".to_owned() }
 fn default_loader() -> String { "fabric".to_owned() }
+fn default_instance_name() -> String { "Tensura Client".to_owned() }
 
 enum WorkerMessage {
     Status(String),
@@ -103,6 +106,7 @@ struct TensuraApp {
     new_server_address: String,
     new_server_players: String,
     new_server_capacity: String,
+    new_instance_name: String,
 }
 
 impl TensuraApp {
@@ -140,6 +144,7 @@ impl TensuraApp {
             new_server_address: String::new(),
             new_server_players: "0".to_owned(),
             new_server_capacity: "20".to_owned(),
+            new_instance_name: String::new(),
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
@@ -149,9 +154,12 @@ impl TensuraApp {
     fn data_dir() -> PathBuf {
         dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("TensuraLauncher")
     }
-    fn instance_dir() -> PathBuf { Self::data_dir().join("instances").join("Tensura Client") }
-    fn game_dir() -> PathBuf { Self::instance_dir().join("game") }
-    fn minecraft_dir() -> PathBuf { Self::instance_dir().join("minecraft") }
+    fn instance_dir_for(name: &str) -> PathBuf {
+        Self::data_dir().join("instances").join(sanitize_instance_name(name))
+    }
+    fn current_instance_dir(&self) -> PathBuf { Self::instance_dir_for(&self.settings.instance_name) }
+    fn current_game_dir(&self) -> PathBuf { self.current_instance_dir().join("game") }
+    fn current_minecraft_dir(&self) -> PathBuf { self.current_instance_dir().join("minecraft") }
     fn settings_path() -> PathBuf { Self::data_dir().join("settings.json") }
 
     fn load_settings() -> Settings {
@@ -164,6 +172,7 @@ impl TensuraApp {
                 ram_gb: 4,
                 minecraft_version: MC_VERSION.to_owned(),
                 loader: default_loader(),
+                instance_name: default_instance_name(),
                 offline_username: "TensuraPlayer".to_owned(),
                 servers: Vec::new(),
             })
@@ -223,7 +232,7 @@ impl TensuraApp {
     }
 
     fn profile_exists(&self) -> bool {
-        find_profile_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader).is_some()
+        find_profile_version_id(&self.current_minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader).is_some()
     }
 
     fn status(&mut self, text: impl Into<String>) {
@@ -237,8 +246,9 @@ impl TensuraApp {
         let tx = self.tx.clone();
         let version = self.settings.minecraft_version.clone();
         let loader = self.settings.loader.clone();
+        let instance_dir = self.current_instance_dir();
         thread::spawn(move || {
-            let result = install_tensura(&version, &loader, &tx);
+            let result = install_tensura(&version, &loader, &instance_dir, &tx);
             match result {
                 Ok(message) => { let _ = tx.send(WorkerMessage::Installed(message)); }
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
@@ -277,7 +287,7 @@ impl TensuraApp {
         self.busy = true;
         self.status("Starting Minecraft...");
         let tx = self.tx.clone();
-        let version_id = find_profile_version_id(&Self::minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader);
+        let version_id = find_profile_version_id(&self.current_minecraft_dir(), &self.settings.minecraft_version, &self.settings.loader);
         let Some(version_id) = version_id else {
             self.busy = false;
             self.installed = false;
@@ -285,15 +295,17 @@ impl TensuraApp {
             return;
         };
         let ram = self.settings.ram_gb.clamp(2, 16);
+        let minecraft_dir = self.current_minecraft_dir();
+        let game_dir = self.current_game_dir();
         thread::spawn(move || {
             let result = (|| -> std::result::Result<(), String> {
-                let launcher = Launcher::new(TensuraApp::minecraft_dir());
+                let launcher = Launcher::new(minecraft_dir);
                 let version = launcher.load_version(&version_id).map_err(|e| e.to_string())?;
                 let java = ensure_java()?;
                 let options = LaunchOptions {
                     account,
                     java_executable: Some(java),
-                    game_directory: Some(TensuraApp::game_dir()),
+                    game_directory: Some(game_dir),
                     launcher_name: "Tensura".to_owned(),
                     launcher_version: env!("CARGO_PKG_VERSION").to_owned(),
                     ..Default::default()
@@ -343,11 +355,12 @@ impl TensuraApp {
         let kind = self.page.project_type().to_owned();
         let version = self.settings.minecraft_version.clone();
         let loader = self.settings.loader.clone();
+        let game_dir = self.current_game_dir();
         self.busy = true;
         self.status(format!("Installing {}...", project.title));
         let tx = self.tx.clone();
         thread::spawn(move || {
-            match download_modrinth_project(&project.slug, &kind, &version, &loader, &TensuraApp::game_dir()) {
+            match download_modrinth_project(&project.slug, &kind, &version, &loader, &game_dir) {
                 Ok(path) => { let _ = tx.send(WorkerMessage::Installed(format!("Installed to {}", path.display()))); }
                 Err(error) => { let _ = tx.send(WorkerMessage::Error(error)); }
             }
@@ -598,7 +611,7 @@ impl TensuraApp {
             Page::Shaderpacks => "shaderpacks",
             _ => return,
         };
-        let directory = Self::game_dir().join(folder);
+        let directory = self.current_game_dir().join(folder);
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(RichText::new(title).size(25.0).strong().color(Color32::WHITE));
@@ -709,6 +722,36 @@ impl TensuraApp {
         ui.add_space(14.0);
         egui::Frame::new().fill(Color32::from_rgb(14, 22, 18)).corner_radius(8.0).inner_margin(16.0).show(ui, |ui| {
             ui.label(RichText::new("Tensura Client").size(16.0).strong());
+            ui.label(RichText::new("Instances").size(13.0).strong());
+            let mut available_instances: Vec<String> = fs::read_dir(Self::data_dir().join("instances")).ok()
+                .into_iter().flat_map(|entries| entries.flatten())
+                .filter(|entry| entry.path().is_dir())
+                .map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
+            available_instances.sort();
+            egui::ComboBox::from_id_salt("instance_select")
+                .selected_text(&self.settings.instance_name)
+                .show_ui(ui, |ui| {
+                    for name in &available_instances {
+                        if ui.selectable_value(&mut self.settings.instance_name, name.clone(), name).changed() {
+                            self.save_settings();
+                            self.installed = self.profile_exists();
+                            if !self.installed { self.start_install(); }
+                        }
+                    }
+                });
+            ui.horizontal(|ui| {
+                ui.add(egui::TextEdit::singleline(&mut self.new_instance_name).hint_text("New instance name"));
+                if ui.button("Create & switch").clicked() {
+                    let name = sanitize_instance_name(&self.new_instance_name);
+                    self.settings.instance_name = name.clone();
+                    self.new_instance_name.clear();
+                    let _ = fs::create_dir_all(Self::instance_dir_for(&name));
+                    self.save_settings();
+                    self.installed = self.profile_exists();
+                    if !self.installed { self.start_install(); }
+                }
+            });
+            ui.add_space(8.0);
             let previous_version = self.settings.minecraft_version.clone();
             ui.horizontal(|ui| {
                 ui.label("Minecraft version");
@@ -768,8 +811,8 @@ impl TensuraApp {
                     self.installed = false;
                     self.start_install();
                 }
-                if ui.button("Open game folder ↗").clicked() { let _ = open::that(Self::game_dir()); }
-                if ui.button("Open instance folder ↗").clicked() { let _ = open::that(Self::instance_dir()); }
+                if ui.button("Open game folder ↗").clicked() { let _ = open::that(self.current_game_dir()); }
+                if ui.button("Open instance folder ↗").clicked() { let _ = open::that(self.current_instance_dir()); }
             });
             if ui.button("Save settings").clicked() {
                 let username = self.settings.offline_username.trim().to_owned();
@@ -785,10 +828,10 @@ impl TensuraApp {
             }
         });
         ui.add_space(10.0);
-        ui.label(RichText::new(format!("Instance: {}", Self::instance_dir().display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Mods: {}", Self::game_dir().join("mods").display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Resource packs: {}", Self::game_dir().join("resourcepacks").display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Shaders: {}", Self::game_dir().join("shaderpacks").display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Instance: {}", self.current_instance_dir().display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Mods: {}", self.current_game_dir().join("mods").display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Resource packs: {}", self.current_game_dir().join("resourcepacks").display())).size(10.0).color(Color32::from_gray(130)));
+        ui.label(RichText::new(format!("Shaders: {}", self.current_game_dir().join("shaderpacks").display())).size(10.0).color(Color32::from_gray(130)));
     }
 }
 
@@ -827,6 +870,14 @@ impl eframe::App for TensuraApp {
             }
         });
     }
+}
+
+fn sanitize_instance_name(name: &str) -> String {
+    let cleaned: String = name.chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == ' ' || *ch == '-' || *ch == '_')
+        .take(32).collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() { default_instance_name() } else { cleaned.to_owned() }
 }
 
 fn find_profile_version_id(root: &Path, mc_version: &str, loader: &str) -> Option<String> {
@@ -908,13 +959,15 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
     Err("Install Java 21 or newer and make java available on PATH.".to_owned())
 }
 
-fn install_tensura(version: &str, loader: &str, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
-    fs::create_dir_all(TensuraApp::game_dir()).map_err(|e| e.to_string())?;
+fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender<WorkerMessage>) -> std::result::Result<String, String> {
+    let game_dir = instance_dir.join("game");
+    let minecraft_dir = instance_dir.join("minecraft");
+    fs::create_dir_all(&game_dir).map_err(|e| e.to_string())?;
     for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
-        fs::create_dir_all(TensuraApp::game_dir().join(folder)).map_err(|e| e.to_string())?;
+        fs::create_dir_all(game_dir.join(folder)).map_err(|e| e.to_string())?;
     }
     let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {version} + {loader}...")));
-    let launcher = Launcher::new(TensuraApp::minecraft_dir());
+    let launcher = Launcher::new(minecraft_dir);
     let loader_spec = match loader {
         "fabric" => Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
         "quilt" => Some(LoaderSpec::Quilt { version: LoaderVersion::Latest }),
@@ -939,7 +992,7 @@ fn install_tensura(version: &str, loader: &str, tx: &Sender<WorkerMessage>) -> s
     let mut installed = Vec::new();
     let mut skipped = Vec::new();
     for slug in if loader == "fabric" { PERF_MODS } else { &[] } {
-        match download_modrinth_project(slug, "mod", version, loader, &TensuraApp::game_dir()) {
+        match download_modrinth_project(slug, "mod", version, loader, &game_dir) {
             Ok(_) => installed.push(*slug),
             Err(_) => skipped.push(*slug),
         }
@@ -947,7 +1000,7 @@ fn install_tensura(version: &str, loader: &str, tx: &Sender<WorkerMessage>) -> s
     let shader = download_modrinth_project("complementary-reimagined", "shader", version, loader, &TensuraApp::game_dir());
     let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
     let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
-        install.version_id, installed.len(), skipped.len(), version, shader_status, TensuraApp::instance_dir().display());
+        install.version_id, installed.len(), skipped.len(), version, shader_status, instance_dir.display());
     Ok(report)
 }
 
