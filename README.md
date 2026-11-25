@@ -13,7 +13,8 @@ A Windows-first Minecraft Java launcher built with Rust, egui, and mc-launcher-c
 - Installed mod, resource-pack, and shader-pack inventory with file removal and folder shortcuts.
 - Performance mod preset for Fabric and Complementary Reimagined shader installation when compatible.
 - Server list with live status refresh.
-- Per-instance settings, memory allocation, custom backgrounds including animated GIFs, and accent customization.
+- Instance selection with isolated saves, mods, resource packs, shader packs, screenshots, and configuration files.
+- Launcher settings for Minecraft version, loader, memory allocation, custom backgrounds including animated GIFs, and accent customization.
 - Windows installer generated with Inno Setup through GitHub Actions.
 
 ## Accounts
@@ -22,7 +23,7 @@ Offline mode does not authenticate a Microsoft account or bypass premium authent
 
 ## Data locations
 
-Settings are stored under the operating system application-data directory in `TensuraLauncher/settings.json`. Instances are stored under `TensuraLauncher/instances/<instance name>`, with separate `minecraft` and `game` directories.
+Launcher settings are stored under the operating system application-data directory in `TensuraLauncher/settings.json`. Instance game data is stored under `TensuraLauncher/instances/<instance name>`, with separate `minecraft` and `game` directories.
 
 ## Build on Windows
 
