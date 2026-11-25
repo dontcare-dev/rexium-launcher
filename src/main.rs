@@ -640,257 +640,179 @@ impl TensuraApp {
     }
 
     fn browser(&mut self, ui: &mut egui::Ui) {
-        let title = match self.page { Page::Mods => "Mods", Page::ResourcePacks => "Resource packs", _ => "Shaders" };
-        let folder = match self.page {
-            Page::Mods => "mods",
-            Page::ResourcePacks => "resourcepacks",
-            Page::Shaderpacks => "shaderpacks",
-            _ => return,
-        };
-        let directory = self.current_game_dir().join(folder);
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.label(RichText::new(title).size(25.0).strong().color(Color32::WHITE));
-                ui.label(RichText::new("Discover and manage your Tensura installation").size(12.0).color(Color32::from_gray(150)));
+        let accent=Color32::from_rgb(52,224,183);
+        let muted=Color32::from_rgb(142,160,177);
+        let panel=Color32::from_rgb(13,22,35);
+        let line=Color32::from_rgb(31,48,67);
+        let title=match self.page{Page::Mods=>"Mods",Page::ResourcePacks=>"Resource packs",_=>"Shaders"};
+        let folder=match self.page{Page::Mods=>"mods",Page::ResourcePacks=>"resourcepacks",Page::Shaderpacks=>"shaderpacks",_=>return};
+        let directory=self.current_game_dir().join(folder);
+        ui.horizontal(|ui|{
+            ui.vertical(|ui|{
+                ui.label(RichText::new("TENSURA LIBRARY").size(9.0).strong().color(accent));
+                ui.label(RichText::new(title).size(29.0).strong().color(Color32::WHITE));
+                ui.label(RichText::new("Discover, install and manage content for your active instance.").size(11.0).color(muted));
             });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Open folder ↗").clicked() {
-                    let _ = open::that(&directory);
-                }
-                if ui.selectable_label(self.show_installed, "Installed").clicked() {
-                    self.show_installed = true;
-                    self.results.clear();
-                }
-                if ui.selectable_label(!self.show_installed, "Discover").clicked() {
-                    self.show_installed = false;
-                }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{
+                if ui.button("Open folder ↗").clicked(){let _=open::that(&directory);}
+                if ui.selectable_label(self.show_installed,"INSTALLED").clicked(){self.show_installed=true;self.results.clear();}
+                if ui.selectable_label(!self.show_installed,"DISCOVER").clicked(){self.show_installed=false;}
             });
         });
-        ui.add_space(14.0);
-        if self.show_installed {
-            let mut files: Vec<PathBuf> = fs::read_dir(&directory).ok()
-                .into_iter().flat_map(|entries| entries.flatten())
-                .map(|entry| entry.path()).filter(|path| path.is_file()).collect();
-            files.sort_by_key(|path| path.file_name().map(|name| name.to_string_lossy().to_lowercase()).unwrap_or_default());
-            ui.label(RichText::new(format!("{} installed files", files.len())).size(11.0).color(Color32::from_rgb(112, 211, 184)));
-            ui.add_space(8.0);
-            if files.is_empty() {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(45.0);
-                    ui.label(RichText::new("Nothing installed here yet").size(17.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("Browse Modrinth to add something to this folder.").size(12.0).color(Color32::from_gray(150)));
+        ui.add_space(18.0);
+        egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(14.0).show(ui,|ui|{
+            if self.show_installed {
+                let mut files:Vec<PathBuf>=fs::read_dir(&directory).ok().into_iter().flat_map(|x|x.flatten()).map(|x|x.path()).filter(|x|x.is_file()).collect();
+                files.sort_by_key(|p|p.file_name().map(|x|x.to_string_lossy().to_lowercase()).unwrap_or_default());
+                ui.horizontal(|ui|{
+                    ui.label(RichText::new(format!("{} ITEMS INSTALLED",files.len())).size(10.0).strong().color(accent));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(format!("INSTANCE  /  {}",self.settings.instance_name)).size(9.0).color(muted));});
                 });
-            }
-            let mut remove_file: Option<PathBuf> = None;
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for path in &files {
-                    egui::Frame::new().fill(Color32::from_rgb(13, 22, 31))
-                        .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(30, 48, 61)))
-                        .corner_radius(9.0).inner_margin(12.0).show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(RichText::new("▣").size(23.0).color(Color32::from_rgb(84, 210, 177)));
-                                ui.vertical(|ui| {
-                                    ui.label(RichText::new(path.file_name().unwrap_or_default().to_string_lossy()).size(13.0).strong().color(Color32::WHITE));
-                                    let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
-                                    ui.label(RichText::new(format!("{:.1} MB", size as f64 / 1_048_576.0)).size(10.0).color(Color32::from_gray(145)));
+                ui.add_space(12.0);
+                if files.is_empty(){ui.vertical_centered(|ui|{ui.add_space(48.0);ui.label(RichText::new("Your library is empty").size(18.0).strong().color(Color32::WHITE));ui.label(RichText::new("Switch to Discover to find content on Modrinth.").size(11.0).color(muted));});}
+                let mut remove=None;
+                egui::ScrollArea::vertical().show(ui,|ui|{
+                    for path in &files {
+                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0,line)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{
+                                ui.label(RichText::new(match folder{"mods"=>"◈","resourcepacks"=>"▧",_=>"✧"}).size(25.0).color(accent));
+                                ui.vertical(|ui|{
+                                    ui.label(RichText::new(path.file_name().unwrap_or_default().to_string_lossy()).size(12.0).strong().color(Color32::WHITE));
+                                    let size=fs::metadata(path).map(|m|m.len()).unwrap_or(0);
+                                    ui.label(RichText::new(format!("{:.2} MB  ·  {}",size as f64/1_048_576.0,folder)).size(9.0).color(muted));
                                 });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    if ui.add(egui::Button::new(RichText::new("REMOVE").size(10.0).strong()).fill(Color32::from_rgb(104, 39, 51))).clicked() {
-                                        remove_file = Some(path.clone());
-                                    }
-                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{if ui.add(egui::Button::new("Remove").fill(Color32::from_rgb(75,35,48))).clicked(){remove=Some(path.clone());}});
                             });
                         });
-                    ui.add_space(6.0);
-                }
-            });
-            if let Some(path) = remove_file {
-                match fs::remove_file(&path) {
-                    Ok(()) => self.status(format!("Removed {}", path.file_name().unwrap_or_default().to_string_lossy())),
-                    Err(error) => self.status(format!("Could not remove file: {error}")),
-                }
-            }
-            return;
-        }
-        ui.horizontal(|ui| {
-            let width = (ui.available_width() - 110.0).max(120.0);
-            let field = ui.add_sized([width, 38.0], egui::TextEdit::singleline(&mut self.query).hint_text("Search Modrinth..."));
-            if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) { self.search(); }
-            if ui.add_sized([100.0, 38.0], egui::Button::new("Search").fill(self.accent())).clicked() { self.search(); }
-        });
-        ui.add_space(12.0);
-        if self.results.is_empty() && !self.busy {
-            ui.vertical_centered(|ui| {
-                ui.add_space(35.0);
-                ui.label(RichText::new("Find your next upgrade").size(18.0).strong().color(Color32::WHITE));
-                ui.label(RichText::new("Search Modrinth for compatible projects and install them directly.").size(12.0).color(Color32::from_gray(150)));
-            });
-        }
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for project in self.results.clone() {
-                egui::Frame::new().fill(Color32::from_rgb(13, 22, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(30, 48, 61))).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        let artwork = if project.icon_url.is_empty() {
-                            egui::Image::new(egui::include_image!("../assets/tensura-mark.svg"))
-                        } else {
-                            egui::Image::from_uri(project.icon_url.clone())
-                        };
-                        ui.add(artwork.fit_to_exact_size(Vec2::splat(76.0)));
-                        ui.add_space(12.0);
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new(&project.title).size(15.0).strong().color(Color32::WHITE));
-                            ui.label(RichText::new(&project.description).size(11.0).color(Color32::from_rgb(164,181,194)));
-                            ui.add_space(5.0);
-                            ui.label(RichText::new(format!("{} downloads  ·  Modrinth", project.downloads)).size(10.0).color(Color32::from_rgb(104,215,190)));
-                        });
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.add(egui::Button::new(RichText::new("＋ INSTALL").strong()).fill(Color32::from_rgb(44,190,145))).clicked() { self.install_project(project.clone()); }
-                        });
-                    });
+                        ui.add_space(6.0);
+                    }
                 });
-                ui.add_space(6.0);
+                if let Some(path)=remove{match fs::remove_file(&path){Ok(())=>self.status(format!("Removed {}",path.file_name().unwrap_or_default().to_string_lossy())),Err(e)=>self.status(format!("Could not remove file: {e}"))}}
+            } else {
+                ui.horizontal(|ui|{
+                    ui.label(RichText::new("MODRINTH SEARCH").size(9.0).strong().color(accent));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(format!("{}  ·  {}",self.settings.minecraft_version,self.settings.loader.to_uppercase())).size(9.0).color(muted));});
+                });
+                ui.add_space(8.0);
+                ui.horizontal(|ui|{
+                    let width=(ui.available_width()-116.0).max(120.0);
+                    let field=ui.add_sized([width,42.0],egui::TextEdit::singleline(&mut self.query).hint_text("Search mods, packs and shaders…"));
+                    if field.lost_focus()&&ui.input(|i|i.key_pressed(egui::Key::Enter)){self.search();}
+                    if ui.add_sized([106.0,42.0],egui::Button::new("SEARCH  →").fill(accent)).clicked(){self.search();}
+                });
+                ui.add_space(12.0);
+                if self.busy{ui.horizontal(|ui|{ui.spinner();ui.label(RichText::new("Searching Modrinth…").color(muted));});}
+                else if self.results.is_empty(){ui.vertical_centered(|ui|{ui.add_space(42.0);ui.label(RichText::new("Find something new").size(19.0).strong().color(Color32::WHITE));ui.label(RichText::new("Search the Modrinth catalogue to add content to this instance.").size(11.0).color(muted));});}
+                egui::ScrollArea::vertical().show(ui,|ui|{
+                    for project in self.results.clone(){
+                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0,line)).corner_radius(11.0).inner_margin(12.0).show(ui,|ui|{
+                            ui.horizontal(|ui|{
+                                let artwork=if project.icon_url.is_empty(){egui::Image::new(egui::include_image!("../assets/tensura-mark.svg"))}else{egui::Image::from_uri(project.icon_url.clone())};
+                                ui.add(artwork.fit_to_exact_size(Vec2::splat(58.0)));
+                                ui.add_space(10.0);
+                                ui.vertical(|ui|{
+                                    ui.label(RichText::new(&project.title).size(13.0).strong().color(Color32::WHITE));
+                                    ui.label(RichText::new(&project.description).size(10.0).color(muted));
+                                    ui.label(RichText::new(format!("{} downloads  ·  Modrinth",project.downloads)).size(9.0).color(accent));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{if ui.add(egui::Button::new("＋ INSTALL").fill(Color32::from_rgb(34,112,94))).clicked(){self.install_project(project.clone());}});
+                            });
+                        });
+                        ui.add_space(7.0);
+                    }
+                });
             }
         });
     }
 
     fn settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.label(RichText::new("Settings").size(25.0).strong());
-        ui.add_space(14.0);
-        egui::Frame::new().fill(Color32::from_rgb(14, 22, 18)).corner_radius(8.0).inner_margin(16.0).show(ui, |ui| {
-            ui.label(RichText::new("Tensura Client").size(16.0).strong());
-            ui.label(RichText::new("Instances").size(13.0).strong());
-            let mut available_instances: Vec<String> = fs::read_dir(Self::data_dir().join("instances")).ok()
-                .into_iter().flat_map(|entries| entries.flatten())
-                .filter(|entry| entry.path().is_dir())
-                .map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
-            available_instances.sort();
-            let mut selected_instance = self.settings.instance_name.clone();
-            egui::ComboBox::from_id_salt("instance_select")
-                .selected_text(&selected_instance)
-                .show_ui(ui, |ui| {
-                    for name in &available_instances {
-                        ui.selectable_value(&mut selected_instance, name.clone(), name);
-                    }
+        let accent=Color32::from_rgb(52,224,183);
+        let muted=Color32::from_rgb(142,160,177);
+        let panel=Color32::from_rgb(13,22,35);
+        let line=Color32::from_rgb(31,48,67);
+        ui.label(RichText::new("PREFERENCES").size(9.0).strong().color(accent));
+        ui.label(RichText::new("Settings").size(29.0).strong().color(Color32::WHITE));
+        ui.label(RichText::new("Configure your launcher, game instance and account.").size(11.0).color(muted));
+        ui.add_space(16.0);
+        egui::ScrollArea::vertical().show(ui,|ui|{
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+                ui.label(RichText::new("GAME INSTANCE").size(11.0).strong().color(accent));
+                ui.add_space(10.0);
+                let mut available_instances:Vec<String>=fs::read_dir(Self::data_dir().join("instances")).ok().into_iter().flat_map(|x|x.flatten()).filter(|x|x.path().is_dir()).map(|x|x.file_name().to_string_lossy().to_string()).collect();
+                available_instances.sort();
+                let mut selected=self.settings.instance_name.clone();
+                ui.horizontal(|ui|{
+                    ui.label(RichText::new("Active instance").color(muted));
+                    egui::ComboBox::from_id_salt("instance_select").selected_text(&selected).show_ui(ui,|ui|{for name in &available_instances{ui.selectable_value(&mut selected,name.clone(),name);}});
                 });
-            let mut delete_instance: Option<String> = None;
-            for name in &available_instances {
-                if name != &self.settings.instance_name {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(name).size(11.0).color(Color32::from_gray(170)));
-                        if ui.small_button("Delete").clicked() { delete_instance = Some(name.clone()); }
-                    });
-                }
-            }
-            if let Some(name) = delete_instance {
-                match fs::remove_dir_all(Self::instance_dir_for(&name)) {
-                    Ok(()) => self.status(format!("Deleted instance {name} and its local game data.")),
-                    Err(error) => self.status(format!("Could not delete instance {name}: {error}")),
-                }
-            }
-            if selected_instance != self.settings.instance_name {
-                self.settings.instance_name = selected_instance;
-                self.save_settings();
-                self.installed = self.profile_exists();
-                if !self.installed { self.start_install(); }
-            }
-            ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.new_instance_name).hint_text("New instance name"));
-                if ui.button("Create & switch").clicked() && !self.new_instance_name.trim().is_empty() {
-                    let name = sanitize_instance_name(&self.new_instance_name);
-                    self.settings.instance_name = name.clone();
-                    self.new_instance_name.clear();
-                    let _ = fs::create_dir_all(Self::instance_dir_for(&name));
-                    self.save_settings();
-                    self.installed = self.profile_exists();
-                    if !self.installed { self.start_install(); }
-                }
-            });
-            ui.add_space(8.0);
-            let previous_version = self.settings.minecraft_version.clone();
-            ui.horizontal(|ui| {
-                ui.label("Minecraft version");
-                egui::ComboBox::from_id_salt("mc_version").selected_text(&self.settings.minecraft_version).show_ui(ui, |ui| {
-                    for version in &self.available_versions {
-                        ui.selectable_value(&mut self.settings.minecraft_version, version.clone(), version);
-                    }
+                let mut delete=None;
+                ui.horizontal_wrapped(|ui|{
+                    for name in &available_instances{if name!=&self.settings.instance_name&&ui.small_button(format!("Delete {name}")).clicked(){delete=Some(name.clone());}}
                 });
-            });
-            if self.settings.minecraft_version != previous_version {
-                self.installed = self.profile_exists();
-                self.save_settings();
-                if !self.installed { self.start_install(); }
-            }
-            let previous_loader = self.settings.loader.clone();
-            ui.horizontal(|ui| {
-                ui.label("Mod loader");
-                egui::ComboBox::from_id_salt("mod_loader").selected_text(self.settings.loader.to_uppercase()).show_ui(ui, |ui| {
-                    for loader in ["fabric", "quilt", "forge", "neoforge"] {
-                        ui.selectable_value(&mut self.settings.loader, loader.to_owned(), loader.to_uppercase());
-                    }
+                if let Some(name)=delete{match fs::remove_dir_all(Self::instance_dir_for(&name)){Ok(())=>self.status(format!("Deleted instance {name}")),Err(e)=>self.status(format!("Could not delete instance: {e}"))}}
+                if selected!=self.settings.instance_name{self.settings.instance_name=selected;self.save_settings();self.installed=self.profile_exists();if !self.installed{self.start_install();}}
+                ui.horizontal(|ui|{
+                    ui.add(egui::TextEdit::singleline(&mut self.new_instance_name).hint_text("New instance name").desired_width(230.0));
+                    if ui.button("Create instance").clicked()&&!self.new_instance_name.trim().is_empty(){let name=sanitize_instance_name(&self.new_instance_name);self.settings.instance_name=name.clone();self.new_instance_name.clear();let _=fs::create_dir_all(Self::instance_dir_for(&name));self.save_settings();self.installed=self.profile_exists();if !self.installed{self.start_install();}}
                 });
-            });
-            if self.settings.loader != previous_loader {
-                self.installed = self.profile_exists();
-                self.save_settings();
-                if !self.installed { self.start_install(); }
-            }
-            ui.horizontal(|ui| {
-                ui.label("Memory");
-                ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
+                ui.add_space(8.0);
+                ui.columns(2,|cols|{
+                    cols[0].label(RichText::new("Minecraft version").color(muted));
+                    egui::ComboBox::from_id_salt("mc_version").selected_text(&self.settings.minecraft_version).width(cols[0].available_width()).show_ui(&mut cols[0],|ui|{for version in &self.available_versions{ui.selectable_value(&mut self.settings.minecraft_version,version.clone(),version);}});
+                    cols[1].label(RichText::new("Mod loader").color(muted));
+                    egui::ComboBox::from_id_salt("mod_loader").selected_text(self.settings.loader.to_uppercase()).width(cols[1].available_width()).show_ui(&mut cols[1],|ui|{for loader in ["fabric","quilt","forge","neoforge"]{ui.selectable_value(&mut self.settings.loader,loader.to_owned(),loader.to_uppercase());}});
+                });
+                ui.add_space(8.0);
+                ui.horizontal(|ui|{ui.label(RichText::new("Memory allocation").color(muted));ui.add(egui::Slider::new(&mut self.settings.ram_gb,2..=16).suffix(" GB"));});
+                ui.label(RichText::new("Changing version or loader installs the matching profile when needed.").size(9.0).color(muted));
             });
             ui.add_space(10.0);
-            ui.label("Offline player name");
-            ui.text_edit_singleline(&mut self.settings.offline_username);
-            ui.label(RichText::new("Offline mode works without a Microsoft account. Online servers may require a paid Microsoft-owned Java account.").size(10.0).color(Color32::from_gray(145)));
-            ui.add_space(10.0);
-            ui.label("Microsoft app client ID (optional)");
-            ui.text_edit_singleline(&mut self.settings.microsoft_client_id);
-            ui.label(RichText::new("Only needed if you choose Microsoft sign-in.").size(10.0).color(Color32::from_gray(145)));
-            ui.add_space(10.0);
-            if ui.button("Choose background image").clicked() {
-                if let Some(path) = rfd::FileDialog::new().add_filter("Images and GIFs", &["png", "jpg", "jpeg", "webp", "gif"]).pick_file() {
-                    self.settings.background_path = path.display().to_string();
-                    self.background_frames = Self::load_background(ctx, &self.settings.background_path);
-                    self.background_started = Instant::now();
-                }
-            }
-            if ui.button("Clear background").clicked() {
-                self.settings.background_path.clear();
-                self.background_frames.clear();
-            }
-            ui.label("Accent");
-            ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
-            ui.horizontal_wrapped(|ui| {
-                if ui.button("Repair / reinstall client").clicked() {
-                    self.installed = false;
-                    self.start_install();
-                }
-                if ui.button("Open game folder ↗").clicked() { let _ = open::that(self.current_game_dir()); }
-                if ui.button("Open instance folder ↗").clicked() { let _ = open::that(self.current_instance_dir()); }
-                if ui.button("Open launch logs ↗").clicked() { let _ = open::that(self.current_game_dir().join("logs")); }
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+                ui.label(RichText::new("ACCOUNT").size(11.0).strong().color(accent));
+                ui.add_space(8.0);
+                ui.label(RichText::new("Offline username").color(muted));
+                ui.add(egui::TextEdit::singleline(&mut self.settings.offline_username).desired_width(280.0));
+                ui.label(RichText::new("Offline profiles work on servers configured to allow offline-mode connections. Online-mode servers require Microsoft authentication and a Java Edition entitlement.").size(9.0).color(muted));
+                ui.add_space(8.0);
+                ui.label(RichText::new("Microsoft application client ID").color(muted));
+                ui.add(egui::TextEdit::singleline(&mut self.settings.microsoft_client_id).desired_width(360.0));
+                ui.label(RichText::new("Used only for Microsoft device-code sign-in.").size(9.0).color(muted));
             });
-            if ui.button("Save settings").clicked() {
-                let username = self.settings.offline_username.trim().to_owned();
-                if !username.is_empty() {
-                    self.settings.offline_username = username.chars().filter(|ch| ch.is_ascii_alphanumeric() || *ch == char::from(95)).take(16).collect();
-                    if self.account_name.as_deref().is_some_and(|name| name.ends_with("(offline)")) {
-                        self.account = Some(Account::offline(&self.settings.offline_username));
-                        self.account_name = Some(format!("{} (offline)", self.settings.offline_username));
-                    }
-                }
+            ui.add_space(10.0);
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+                ui.label(RichText::new("APPEARANCE").size(11.0).strong().color(accent));
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui|{
+                    if ui.button("Choose background image").clicked(){if let Some(path)=rfd::FileDialog::new().add_filter("Images and GIFs",&["png","jpg","jpeg","webp","gif"]).pick_file(){self.settings.background_path=path.display().to_string();self.background_frames=Self::load_background(ctx,&self.settings.background_path);self.background_started=Instant::now();}}
+                    if ui.button("Reset background").clicked(){self.settings.background_path.clear();self.background_frames.clear();}
+                });
+                ui.add_space(6.0);
+                ui.horizontal(|ui|{ui.label(RichText::new("Accent colour").color(muted));ui.add(egui::Slider::new(&mut self.settings.accent_hue,0.0..=1.0).show_value(false));});
+            });
+            ui.add_space(10.0);
+            egui::Frame::new().fill(panel).stroke(egui::Stroke::new(1.0,line)).corner_radius(13.0).inner_margin(16.0).show(ui,|ui|{
+                ui.label(RichText::new("MAINTENANCE").size(11.0).strong().color(accent));
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui|{
+                    if ui.button("Repair / reinstall").clicked(){self.installed=false;self.start_install();}
+                    if ui.button("Open game folder ↗").clicked(){let _=open::that(self.current_game_dir());}
+                    if ui.button("Open instance folder ↗").clicked(){let _=open::that(self.current_instance_dir());}
+                    if ui.button("Open logs ↗").clicked(){let _=open::that(self.current_game_dir().join("logs"));}
+                });
+                ui.add_space(8.0);
+                ui.label(RichText::new(format!("Instance location  ·  {}",self.current_instance_dir().display())).size(9.0).color(muted));
+            });
+            ui.add_space(12.0);
+            if ui.add_sized([ui.available_width(),42.0],egui::Button::new(RichText::new("SAVE ALL SETTINGS").strong()).fill(accent)).clicked(){
+                let username=self.settings.offline_username.trim().to_owned();
+                if !username.is_empty(){self.settings.offline_username=username.chars().filter(|c|c.is_ascii_alphanumeric()||*c=='_').take(16).collect();}
                 self.save_settings();
+                if self.account_name.as_deref().is_some_and(|n|n.ends_with("(offline)")){self.account=Some(Account::offline(&self.settings.offline_username));self.account_name=Some(format!("{} (offline)",self.settings.offline_username));}
                 self.status("Settings saved.");
             }
         });
-        ui.add_space(10.0);
-        ui.label(RichText::new(format!("Instance: {}", self.current_instance_dir().display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Mods: {}", self.current_game_dir().join("mods").display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Resource packs: {}", self.current_game_dir().join("resourcepacks").display())).size(10.0).color(Color32::from_gray(130)));
-        ui.label(RichText::new(format!("Shaders: {}", self.current_game_dir().join("shaderpacks").display())).size(10.0).color(Color32::from_gray(130)));
     }
-}
 
-impl eframe::App for TensuraApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_messages();
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
