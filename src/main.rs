@@ -702,6 +702,7 @@ impl TensuraApp {
         ui.add_space(14.0);
         egui::Frame::new().fill(Color32::from_rgb(14, 22, 18)).corner_radius(8.0).inner_margin(16.0).show(ui, |ui| {
             ui.label(RichText::new("Tensura Client").size(16.0).strong());
+            let previous_version = self.settings.minecraft_version.clone();
             ui.horizontal(|ui| {
                 ui.label("Minecraft version");
                 egui::ComboBox::from_id_salt("mc_version").selected_text(&self.settings.minecraft_version).show_ui(ui, |ui| {
@@ -710,6 +711,11 @@ impl TensuraApp {
                     }
                 });
             });
+            if self.settings.minecraft_version != previous_version {
+                self.installed = self.profile_exists();
+                self.save_settings();
+                if !self.installed { self.start_install(); }
+            }
             ui.horizontal(|ui| {
                 ui.label("Memory");
                 ui.add(egui::Slider::new(&mut self.settings.ram_gb, 2..=16).suffix(" GB"));
@@ -736,6 +742,14 @@ impl TensuraApp {
             }
             ui.label("Accent");
             ui.add(egui::Slider::new(&mut self.settings.accent_hue, 0.0..=1.0).show_value(false));
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Repair / reinstall client").clicked() {
+                    self.installed = false;
+                    self.start_install();
+                }
+                if ui.button("Open game folder ↗").clicked() { let _ = open::that(Self::game_dir()); }
+                if ui.button("Open instance folder ↗").clicked() { let _ = open::that(Self::instance_dir()); }
+            });
             if ui.button("Save settings").clicked() {
                 let username = self.settings.offline_username.trim().to_owned();
                 if !username.is_empty() {
