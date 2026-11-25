@@ -451,13 +451,13 @@ impl TensuraApp {
 
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tensura_sidebar")
-            .exact_width(76.0)
+            .exact_width(88.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 12, 22)).inner_margin(egui::Margin::symmetric(12, 16)))
+            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 31)).inner_margin(egui::Margin::symmetric(17, 16)))
             .show(ctx, |ui| {
                 let mark = egui::Image::from_bytes("bytes://tensura-mark.svg", include_bytes!("../assets/tensura-mark.svg"));
                 ui.add_sized(Vec2::splat(44.0), mark);
-                ui.add_space(30.0);
+                ui.add_space(34.0);
                 for page in [Page::Home, Page::Mods, Page::ResourcePacks, Page::Shaderpacks, Page::Settings] {
                     let selected = self.page == page;
                     let icon_bytes: &'static [u8] = match page {
@@ -467,7 +467,7 @@ impl TensuraApp {
                         Page::Shaderpacks => include_bytes!("../assets/nav-shaders.svg"),
                         Page::Settings => include_bytes!("../assets/nav-settings.svg"),
                     };
-                    let (rect, response) = ui.allocate_exact_size(Vec2::new(52.0, 64.0), egui::Sense::click());
+                    let (rect, response) = ui.allocate_exact_size(Vec2::new(54.0, 72.0), egui::Sense::click());
                     if response.clicked() {
                         self.page = page;
                         self.results.clear();
@@ -475,10 +475,10 @@ impl TensuraApp {
                     if selected {
                         ui.painter().line_segment(
                             [rect.left_top() + egui::vec2(1.0, 9.0), rect.left_bottom() - egui::vec2(-1.0, 9.0)],
-                            egui::Stroke::new(3.0_f32, Color32::from_rgb(80, 239, 204)),
+                            egui::Stroke::new(3.5_f32, Color32::from_rgb(70, 239, 195)),
                         );
                     }
-                    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 7.0), Vec2::splat(30.0));
+                    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 9.0), Vec2::splat(32.0));
                     ui.put(icon_rect, egui::Image::from_bytes(
                         format!("bytes://nav-{}.svg", page.label()),
                         icon_bytes,
@@ -487,7 +487,7 @@ impl TensuraApp {
                         egui::pos2(rect.center().x, rect.bottom() - 8.0),
                         egui::Align2::CENTER_CENTER,
                         page.label(),
-                        egui::FontId::proportional(7.5),
+                        egui::FontId::proportional(8.0),
                         if selected { Color32::WHITE } else { Color32::from_rgb(139, 154, 174) },
                     );
                     ui.add_space(8.0);
@@ -821,18 +821,18 @@ impl eframe::App for TensuraApp {
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
         if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
         self.sidebar(ctx);
-        egui::TopBottomPanel::top("topbar").exact_height(54.0)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(5, 11, 13)).inner_margin(egui::Margin::symmetric(18, 0)))
+        egui::TopBottomPanel::top("topbar").exact_height(64.0)
+            .frame(egui::Frame::new().fill(Color32::from_rgb(8, 15, 34)).stroke(egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(120, 160, 255, 45))).inner_margin(egui::Margin::symmetric(22, 0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.label(RichText::new("TENSURA").size(16.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("LAUNCHER").size(9.0).strong().color(Color32::from_rgb(0, 211, 137)));
+                    ui.label(RichText::new("◕  TENSURA").size(17.0).strong().color(Color32::WHITE));
+                    ui.label(RichText::new("LAUNCHER").size(10.0).strong().color(Color32::from_rgb(0, 211, 137)));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if let Some((version, url)) = self.update_available.clone() {
                             if ui.button(format!("UPDATE {version}")).clicked() { let _ = open::that(url); }
                         }
                         let name = self.account_name.as_deref().unwrap_or("Offline player");
-                        egui::ComboBox::from_id_salt("account_menu")
+                        egui::ComboBox::from_id_salt("account_menu").width(160.0)
                             .selected_text(RichText::new(name).size(11.0).color(Color32::WHITE))
                             .show_ui(ui, |ui| {
                                 if ui.button("Offline mode").clicked() {
