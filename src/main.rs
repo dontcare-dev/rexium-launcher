@@ -153,6 +153,7 @@ impl TensuraApp {
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
+        for server in app.settings.servers.clone() { request_server_status(app.tx.clone(), server.address); }
         let update_tx = app.tx.clone();
         thread::spawn(move || check_for_updates(update_tx));
         let versions_tx = app.tx.clone();
@@ -602,8 +603,7 @@ impl TensuraApp {
                         let name=self.new_server_name.trim().to_owned(); let address=self.new_server_address.trim().to_owned();
                         if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
                             self.settings.servers.push(CustomServer{name,address:address.clone(),players_online:0,players_max:1,online:false});
-                            let tx=self.tx.clone(); let query_address=address.clone();
-                            thread::spawn(move || { if let Ok(response)=reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}",query_address)).and_then(|r|r.error_for_status()) { if let Ok(data)=response.json::<serde_json::Value>() { let online=data["online"].as_bool().unwrap_or(false); let players_online=data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max=data["players"]["max"].as_u64().unwrap_or(20) as u32; let _=tx.send(WorkerMessage::ServerStatus{address:query_address,online,players_online,players_max}); } } });
+                            let tx=self.tx.clone(); request_server_status(tx, address.clone());
                             self.new_server_name.clear(); self.new_server_address.clear(); self.save_settings();
                         }
                     }
@@ -619,8 +619,7 @@ impl TensuraApp {
                             ui.label(RichText::new(format!("{}  ·  {}/{}",if server.online {"ONLINE"} else {"OFFLINE"},server.players_online,server.players_max)).size(9.0).color(muted));
                         });
                         if ui.small_button("↻").clicked() {
-                            let tx=self.tx.clone(); let address=server.address.clone();
-                            thread::spawn(move || { if let Ok(response)=reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}",address)).and_then(|r|r.error_for_status()) { if let Ok(data)=response.json::<serde_json::Value>() { let online=data["online"].as_bool().unwrap_or(false); let players_online=data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max=data["players"]["max"].as_u64().unwrap_or(20) as u32; let _=tx.send(WorkerMessage::ServerStatus{address,online,players_online,players_max}); } } });
+                            let tx=self.tx.clone(); request_server_status(tx, server.address.clone());
                         }
                         if ui.small_button("×").clicked() { remove_server=Some(index); }
                     });
@@ -947,6 +946,19 @@ fn version_is_newer(latest: &str, current: &str) -> bool {
         if left != right { return left > right; }
     }
     false
+}
+
+fn request_server_status(tx: Sender<WorkerMessage>, address: String) {
+    thread::spawn(move || {
+        let result = reqwest::blocking::Client::builder().timeout(Duration::from_secs(12)).user_agent("TensuraLauncher").build()
+            .and_then(|client| client.get(format!("https://api.mcsrvstat.us/3/{address}")).send())
+            .and_then(|response| response.error_for_status()).and_then(|response| response.json::<serde_json::Value>());
+        let (online, players_online, players_max) = match result {
+            Ok(data) => (data["online"].as_bool().unwrap_or(false), data["players"]["online"].as_u64().unwrap_or(0) as u32, data["players"]["max"].as_u64().unwrap_or(0) as u32),
+            Err(_) => (false, 0, 0),
+        };
+        let _ = tx.send(WorkerMessage::ServerStatus { address, online, players_online, players_max });
+    });
 }
 
 fn fetch_release_versions(tx: Sender<WorkerMessage>) {
