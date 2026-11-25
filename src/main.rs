@@ -728,20 +728,23 @@ impl TensuraApp {
                 .filter(|entry| entry.path().is_dir())
                 .map(|entry| entry.file_name().to_string_lossy().to_string()).collect();
             available_instances.sort();
+            let mut selected_instance = self.settings.instance_name.clone();
             egui::ComboBox::from_id_salt("instance_select")
-                .selected_text(&self.settings.instance_name)
+                .selected_text(&selected_instance)
                 .show_ui(ui, |ui| {
                     for name in &available_instances {
-                        if ui.selectable_value(&mut self.settings.instance_name, name.clone(), name).changed() {
-                            self.save_settings();
-                            self.installed = self.profile_exists();
-                            if !self.installed { self.start_install(); }
-                        }
+                        ui.selectable_value(&mut selected_instance, name.clone(), name);
                     }
                 });
+            if selected_instance != self.settings.instance_name {
+                self.settings.instance_name = selected_instance;
+                self.save_settings();
+                self.installed = self.profile_exists();
+                if !self.installed { self.start_install(); }
+            }
             ui.horizontal(|ui| {
                 ui.add(egui::TextEdit::singleline(&mut self.new_instance_name).hint_text("New instance name"));
-                if ui.button("Create & switch").clicked() {
+                if ui.button("Create & switch").clicked() && !self.new_instance_name.trim().is_empty() {
                     let name = sanitize_instance_name(&self.new_instance_name);
                     self.settings.instance_name = name.clone();
                     self.new_instance_name.clear();
