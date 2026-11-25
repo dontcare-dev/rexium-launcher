@@ -118,11 +118,11 @@ impl TensuraApp {
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.window_fill = Color32::BLACK;
-        style.visuals.panel_fill = Color32::BLACK;
-        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(26, 34, 29);
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(39, 62, 46);
-        style.visuals.widgets.active.bg_fill = Color32::from_rgb(46, 92, 58);
+        style.visuals.window_fill = Color32::from_rgb(8, 14, 25);
+        style.visuals.panel_fill = Color32::from_rgb(8, 14, 25);
+        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(20, 33, 48);
+        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(28, 68, 68);
+        style.visuals.widgets.active.bg_fill = Color32::from_rgb(36, 112, 96);
         style.spacing.item_spacing = Vec2::new(10.0, 10.0);
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
