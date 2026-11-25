@@ -956,7 +956,7 @@ fn ensure_java() -> std::result::Result<PathBuf, String> {
             }
             None
         }
-        return locate(&runtime_dir).ok_or_else(|| "Java 21 runtime installation did not produce java.exe.".to_owned());
+        locate(&runtime_dir).ok_or_else(|| "Java 21 runtime installation did not produce java.exe.".to_owned())
     }
     #[cfg(not(target_os = "windows"))]
     Err("Install Java 21 or newer and make java available on PATH.".to_owned())
