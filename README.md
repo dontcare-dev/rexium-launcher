@@ -1,25 +1,39 @@
 # Tensura Launcher
 
-Tensura Launcher is a Minecraft launcher built in Rust.
+A Windows-first Minecraft Java launcher built with Rust, egui, and mc-launcher-core.
 
-## Tensura Client
+## Features
 
-Tensura Client installs as the default Fabric profile with a performance mod stack and Complementary Reimagined shaders when compatible releases are available. Mods, resource packs, shader packs, saves, screenshots, and configs are stored in the managed instance game directory.
+- Isolated named instances with their own Minecraft files, saves, mods, resource packs, shader packs, and configuration.
+- Minecraft Java installation with Fabric, Quilt, Forge, and NeoForge profiles.
+- Automatic Java 21 runtime provisioning on Windows when no compatible runtime is available.
+- Offline profiles for single-player and servers that permit offline-mode connections.
+- Microsoft device-code authentication for accounts that own Minecraft: Java Edition.
+- Modrinth discovery filtered by the selected Minecraft version and mod loader, with project artwork and one-click installation.
+- Installed mod, resource-pack, and shader-pack inventory with file removal and folder shortcuts.
+- Performance mod preset for Fabric and Complementary Reimagined shader installation when compatible.
+- Server list with live status refresh.
+- Per-instance settings, memory allocation, custom backgrounds including animated GIFs, and accent customization.
+- Windows installer generated with Inno Setup through GitHub Actions.
 
 ## Accounts
 
-Microsoft sign-in is optional. Offline mode is available without a Microsoft account. Offline play is intended for single-player and compatible offline/LAN use; online servers may require a legitimate Microsoft account that owns Minecraft: Java Edition. Microsoft sign-in requires a public-client application ID configured in Settings.
+Offline mode does not authenticate a Microsoft account or bypass premium authentication. Online-mode servers may require a legitimate Microsoft account that owns Minecraft: Java Edition. Microsoft sign-in uses a public-client application ID configured in Settings.
 
-## Runtime and paths
+## Data locations
 
-The launcher installs a Java 21 runtime on Windows when a compatible runtime is not found. The managed instance is stored under the TensuraLauncher application data directory in `instances/Tensura Client`; the Minecraft libraries and version metadata are stored in that instance's `minecraft` directory, and game data is stored in its `game` directory.
+Settings are stored under the operating system application-data directory in `TensuraLauncher/settings.json`. Instances are stored under `TensuraLauncher/instances/<instance name>`, with separate `minecraft` and `game` directories.
 
-## Windows installation
+## Build on Windows
 
-Download `TensuraLauncherSetup.exe` from the `TensuraLauncher-Windows` GitHub Actions artifact and run it. The installer creates Start Menu and optional desktop shortcuts. The Tensura profile is installed on first launch.
+Install the stable Rust toolchain and Inno Setup, then run:
 
-## Build
-
+    cargo fmt --all -- --check
+    cargo clippy --release -- -D warnings
+    cargo test --release
     cargo build --release
+    iscc installer/TensuraLauncher.iss
 
-Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang version metadata. Tensura Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
+GitHub Actions runs the same checks on Windows and uploads the executable and setup installer as the `TensuraLauncher-Windows` artifact.
+
+Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang and loader metadata services. Tensura Launcher is an independent community project and is not affiliated with Mojang or Microsoft.
