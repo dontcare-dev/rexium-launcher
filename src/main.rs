@@ -55,6 +55,8 @@ struct Project {
     description: String,
     downloads: u64,
     slug: String,
+    #[serde(default)]
+    icon_url: String,
 }
 
 #[derive(Deserialize)]
@@ -616,15 +618,23 @@ impl TensuraApp {
         ui.add_space(12.0);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for project in self.results.clone() {
-                egui::Frame::new().fill(Color32::from_rgb(15, 23, 19)).corner_radius(7.0).inner_margin(12.0).show(ui, |ui| {
+                egui::Frame::new().fill(Color32::from_rgb(13, 22, 31)).stroke(egui::Stroke::new(1.0, Color32::from_rgb(30, 48, 61))).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
                     ui.horizontal(|ui| {
+                        let artwork = if project.icon_url.is_empty() {
+                            egui::Image::new(egui::include_image!("../assets/tensura-mark.svg"))
+                        } else {
+                            egui::Image::from_uri(project.icon_url.clone())
+                        };
+                        ui.add(artwork.fit_to_exact_size(Vec2::splat(76.0)));
+                        ui.add_space(12.0);
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(&project.title).size(14.0).strong());
-                            ui.label(RichText::new(&project.description).size(11.0).color(Color32::from_gray(150)));
-                            ui.label(RichText::new(format!("{} downloads", project.downloads)).size(10.0).color(Color32::from_gray(125)));
+                            ui.label(RichText::new(&project.title).size(15.0).strong().color(Color32::WHITE));
+                            ui.label(RichText::new(&project.description).size(11.0).color(Color32::from_rgb(164,181,194)));
+                            ui.add_space(5.0);
+                            ui.label(RichText::new(format!("{} downloads  ·  Modrinth", project.downloads)).size(10.0).color(Color32::from_rgb(104,215,190)));
                         });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("Install").clicked() { self.install_project(project.clone()); }
+                            if ui.add(egui::Button::new(RichText::new("＋ INSTALL").strong()).fill(Color32::from_rgb(44,190,145))).clicked() { self.install_project(project.clone()); }
                         });
                     });
                 });
