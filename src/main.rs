@@ -813,6 +813,9 @@ impl TensuraApp {
         });
     }
 
+}
+
+impl eframe::App for TensuraApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_messages();
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
@@ -1132,8 +1135,8 @@ fn microsoft_device_login(client_id: &str, tx: &Sender<WorkerMessage>) -> std::r
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([1000.0, 650.0]).with_title("Tensura Launcher"),
+        viewport: egui::ViewportBuilder::default().with_inner_size([1440.0, 900.0])
+            .with_min_inner_size([1180.0, 720.0]).with_title("Tensura Launcher"),
         ..Default::default()
     };
     eframe::run_native("Tensura Launcher", options, Box::new(|cc| Ok(Box::new(TensuraApp::new(cc)))))
