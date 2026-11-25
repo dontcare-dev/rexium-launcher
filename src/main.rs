@@ -540,7 +540,7 @@ impl TensuraApp {
                     painter.text(egui::pos2(hero.left()+37.0, hero.bottom()-94.0), egui::Align2::LEFT_TOP, format!("{}  /  FABRIC", self.settings.minecraft_version), egui::FontId::proportional(13.0), Color32::from_rgb(207,226,220));
                     let play_rect = egui::Rect::from_min_size(egui::pos2(hero.left()+34.0, hero.bottom()-62.0), Vec2::new(218.0, 46.0));
                     painter.rect_filled(play_rect, 7.0, accent);
-                    painter.text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "PLEASE WAIT..." } else { "▶    PLAY" }, egui::FontId::proportional(15.0), Color32::from_rgb(3,25,18));
+                    painter.text(play_rect.center(), egui::Align2::CENTER_CENTER, if self.busy { "PLEASE WAIT..." } else if self.game_running { "MINECRAFT RUNNING" } else { "▶    PLAY" }, egui::FontId::proportional(15.0), Color32::from_rgb(3,25,18));
                     if ui.interact(play_rect, ui.id().with("tensura_play"), egui::Sense::click()).clicked() { self.start_game(); }
 
                     ui.add_space(22.0);
@@ -600,7 +600,7 @@ impl TensuraApp {
                         let name=self.new_server_name.trim().to_owned(); let address=self.new_server_address.trim().to_owned();
                         let online=self.new_server_players.parse::<u32>().unwrap_or(0); let max=self.new_server_capacity.parse::<u32>().unwrap_or(20).max(1);
                         if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
-                            self.settings.servers.push(CustomServer{name,address:address.clone(),players_online:online.min(max),players_max:max,online:true});
+                            self.settings.servers.push(CustomServer{name,address:address.clone(),players_online:0,players_max:1,online:false});
                             let tx=self.tx.clone(); let query_address=address.clone();
                             thread::spawn(move || { if let Ok(response)=reqwest::blocking::get(format!("https://api.mcsrvstat.us/3/{}",query_address)).and_then(|r|r.error_for_status()) { if let Ok(data)=response.json::<serde_json::Value>() { let online=data["online"].as_bool().unwrap_or(false); let players_online=data["players"]["online"].as_u64().unwrap_or(0) as u32; let players_max=data["players"]["max"].as_u64().unwrap_or(20) as u32; let _=tx.send(WorkerMessage::ServerStatus{address:query_address,online,players_online,players_max}); } } });
                             self.new_server_name.clear(); self.new_server_address.clear(); self.save_settings();
