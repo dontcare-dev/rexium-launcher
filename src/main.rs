@@ -1164,6 +1164,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn update_comparison_handles_semantic_versions() {
+        assert!(version_is_newer("v0.3.0", "0.2.9"));
+        assert!(!version_is_newer("v0.2.0", "0.2.0"));
+        assert!(!version_is_newer("v0.1.9", "0.2.0"));
+    }
+
+    #[test]
     fn instance_names_are_path_safe() {
         assert_eq!(sanitize_instance_name("../World?"), "World");
         assert_eq!(sanitize_instance_name("  "), "Tensura Client");

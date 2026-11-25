@@ -16,6 +16,8 @@ A Windows-first Minecraft Java launcher built with Rust, egui, and mc-launcher-c
 - Instance selection with isolated saves, mods, resource packs, shader packs, screenshots, and configuration files.
 - Launcher settings for Minecraft version, loader, memory allocation, custom backgrounds including animated GIFs, and accent customization.
 - Windows installer generated with Inno Setup through GitHub Actions.
+- GitHub release publishing from version tags and in-app update notifications.
+- Installer progress reporting and persistent Java stdout/stderr logs.
 
 ## Accounts
 
