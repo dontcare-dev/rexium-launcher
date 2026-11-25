@@ -38,15 +38,6 @@ impl Page {
             _ => "",
         }
     }
-    fn icon(self) -> &'static str {
-        match self {
-            Self::Home => "⌂",
-            Self::Mods => "▦",
-            Self::ResourcePacks => "▧",
-            Self::Shaderpacks => "◈",
-            Self::Settings => "⚙",
-        }
-    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -100,8 +91,6 @@ struct TensuraApp {
     account: Option<Account>,
     account_name: Option<String>,
     background_frames: Vec<(egui::TextureHandle, Duration)>,
-    hero_texture: egui::TextureHandle,
-    logo_texture: egui::TextureHandle,
     background_started: Instant,
     tx: Sender<WorkerMessage>,
     rx: Receiver<WorkerMessage>,
@@ -126,16 +115,6 @@ impl TensuraApp {
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
         let background_frames = Self::load_background(&cc.egui_ctx, &settings.background_path);
-        let hero_image = image::load_from_memory(include_bytes!("../assets/tensura-hero.jpg"))
-            .map(|image| image.to_rgba8())
-            .unwrap_or_else(|_| image::RgbaImage::from_pixel(2, 2, image::Rgba([8, 18, 22, 255])));
-        let hero_size = [hero_image.width() as usize, hero_image.height() as usize];
-        let hero_texture = cc.egui_ctx.load_texture("tensura_hero", egui::ColorImage::from_rgba_unmultiplied(hero_size, hero_image.as_raw()), egui::TextureOptions::LINEAR);
-        let logo_image = image::load_from_memory(include_bytes!("../assets/tensura-logo.webp"))
-            .map(|image| image.to_rgba8())
-            .unwrap_or_else(|_| image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 190, 130, 255])));
-        let logo_size = [logo_image.width() as usize, logo_image.height() as usize];
-        let logo_texture = cc.egui_ctx.load_texture("tensura_logo", egui::ColorImage::from_rgba_unmultiplied(logo_size, logo_image.as_raw()), egui::TextureOptions::LINEAR);
         let (tx, rx) = mpsc::channel();
         let mut app = Self {
             page: Page::Home,
@@ -147,8 +126,6 @@ impl TensuraApp {
             account: Some(Account::offline("TensuraPlayer")),
             account_name: Some("TensuraPlayer (offline)".to_owned()),
             background_frames,
-            hero_texture,
-            logo_texture,
             background_started: Instant::now(),
             tx,
             rx,
@@ -434,7 +411,7 @@ impl TensuraApp {
                     if selected {
                         ui.painter().line_segment(
                             [rect.left_top() + egui::vec2(1.0, 9.0), rect.left_bottom() - egui::vec2(-1.0, 9.0)],
-                            egui::Stroke::new(3.0, Color32::from_rgb(80, 239, 204)),
+                            egui::Stroke::new(3.0_f32, Color32::from_rgb(80, 239, 204)),
                         );
                     }
                     let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 7.0), Vec2::splat(34.0));
@@ -618,7 +595,7 @@ impl TensuraApp {
         ui.add_space(12.0);
         egui::ScrollArea::vertical().show(ui, |ui| {
             for project in self.results.clone() {
-                egui::Frame::new().fill(Color32::from_rgb(13, 22, 31)).stroke(egui::Stroke::new(1.0, Color32::from_rgb(30, 48, 61))).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+                egui::Frame::new().fill(Color32::from_rgb(13, 22, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(30, 48, 61))).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         let artwork = if project.icon_url.is_empty() {
                             egui::Image::new(egui::include_image!("../assets/tensura-mark.svg"))

@@ -7,28 +7,20 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Install Linux libraries
-        run: sudo apt-get update && sudo apt-get install -y libwayland-dev libxkbcommon-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev
-      - run: cargo fmt --all
-      - run: cargo fmt --all -- --check
-      - run: cargo check --release
-      - run: cargo clippy --release -- -D warnings
-      - run: cargo test --release
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Static analysis
+        run: cargo clippy --release -- -D warnings
+      - name: Tests
+        run: cargo test --release
       - name: Build Windows executable
         run: cargo build --release
       - name: Install Inno Setup
@@ -36,15 +28,11 @@ jobs:
       - name: Build Windows installer
         shell: pwsh
         run: |
-          $iscc = Join-Path "${env:ProgramFiles(x86)}" "Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            $iscc = Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"
-          }
-          if (-not (Test-Path $iscc)) {
-            $iscc = Get-ChildItem "C:\ProgramData\chocolatey\lib\innosetup" -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          }
+          $iscc = Join-Path "${env:ProgramFiles(x86)}" "Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles "Inno Setup 6\\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { $iscc = Get-ChildItem "C:\\ProgramData\\chocolatey\\lib\\innosetup" -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName }
           if (-not $iscc -or -not (Test-Path $iscc)) { throw "Inno Setup compiler was not found." }
-          & $iscc "installer\TensuraLauncher.iss"
+          & $iscc "installer\\TensuraLauncher.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows release files
         uses: actions/upload-artifact@v4
