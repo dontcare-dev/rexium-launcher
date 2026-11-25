@@ -87,6 +87,7 @@ enum WorkerMessage {
     GameExited(Option<i32>),
     ServerStatus { address: String, online: bool, players_online: u32, players_max: u32 },
     UpdateAvailable { version: String, url: String },
+    Versions(Vec<String>),
 }
 
 struct TensuraApp {
@@ -109,6 +110,7 @@ struct TensuraApp {
     new_server_address: String,
     new_instance_name: String,
     update_available: Option<(String, String)>,
+    available_versions: Vec<String>,
 }
 
 impl TensuraApp {
@@ -147,11 +149,14 @@ impl TensuraApp {
             new_server_address: String::new(),
             new_instance_name: String::new(),
             update_available: None,
+            available_versions: vec!["1.21.8".to_owned(), "1.21.5".to_owned(), "1.21.4".to_owned(), "1.21.1".to_owned()],
         };
         app.installed = app.profile_exists();
         if !app.installed { app.start_install(); }
         let update_tx = app.tx.clone();
         thread::spawn(move || check_for_updates(update_tx));
+        let versions_tx = app.tx.clone();
+        thread::spawn(move || fetch_release_versions(versions_tx));
         app
     }
 
@@ -427,6 +432,9 @@ impl TensuraApp {
                 WorkerMessage::UpdateAvailable { version, url } => {
                     self.update_available = Some((version.clone(), url));
                     self.status(format!("Tensura Launcher update {version} is available."));
+                }
+                WorkerMessage::Versions(versions) => {
+                    if !versions.is_empty() { self.available_versions = versions; }
                 }
                 WorkerMessage::ServerStatus { address, online, players_online, players_max } => {
                     if let Some(server) = self.settings.servers.iter_mut().find(|server| server.address == address) {
@@ -789,8 +797,8 @@ impl TensuraApp {
             ui.horizontal(|ui| {
                 ui.label("Minecraft version");
                 egui::ComboBox::from_id_salt("mc_version").selected_text(&self.settings.minecraft_version).show_ui(ui, |ui| {
-                    for version in ["1.21.1", "1.21.4", "1.21.5", "1.21.8"] {
-                        ui.selectable_value(&mut self.settings.minecraft_version, version.to_owned(), version);
+                    for version in &self.available_versions {
+                        ui.selectable_value(&mut self.settings.minecraft_version, version.clone(), version);
                     }
                 });
             });
@@ -924,6 +932,23 @@ fn version_is_newer(latest: &str, current: &str) -> bool {
         if left != right { return left > right; }
     }
     false
+}
+
+fn fetch_release_versions(tx: Sender<WorkerMessage>) {
+    let result = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("TensuraLauncher")
+        .build()
+        .and_then(|client| client.get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json").send())
+        .and_then(|response| response.error_for_status())
+        .and_then(|response| response.json::<serde_json::Value>());
+    if let Ok(manifest) = result {
+        let versions = manifest["versions"].as_array().map(|items| items.iter()
+            .filter(|item| item["type"].as_str() == Some("release"))
+            .filter_map(|item| item["id"].as_str().map(str::to_owned))
+            .collect::<Vec<_>>()).unwrap_or_default();
+        let _ = tx.send(WorkerMessage::Versions(versions));
+    }
 }
 
 fn check_for_updates(tx: Sender<WorkerMessage>) {
