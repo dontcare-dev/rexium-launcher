@@ -203,30 +203,30 @@ impl TensuraApp {
     }
 
     fn load_background(ctx: &egui::Context, path: &str) -> Vec<(egui::TextureHandle, Duration)> {
-        if path.is_empty() { return Vec::new(); }
-        let path_buf = PathBuf::from(path);
-        let is_gif = path_buf.extension().and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
-        let decoded: Vec<(image::RgbaImage, Duration)> = if is_gif {
-            let Ok(file) = fs::File::open(&path_buf) else { return Vec::new(); };
-            let Ok(decoder) = image::codecs::gif::GifDecoder::new(BufReader::new(file)) else { return Vec::new(); };
-            let Ok(frames) = image::AnimationDecoder::into_frames(decoder).collect_frames() else { return Vec::new(); };
-            frames.into_iter().map(|frame| {
-                let delay = frame.delay().numer_denom_ms();
-                let ms = delay.0.checked_div(delay.1).unwrap_or(100).max(30);
-                (frame.into_buffer(), Duration::from_millis(ms as u64))
-            }).collect()
-        } else {
-            let Ok(image) = image::open(&path_buf) else { return Vec::new(); };
+        let decoded: Vec<(image::RgbaImage, Duration)> = if path.is_empty() {
+            let bytes = base64::engine::general_purpose::STANDARD.decode(include_str!("../assets/tensura-hero.b64").trim()).expect("embedded Tensura hero base64");
+            let Ok(image) = image::load_from_memory(&bytes) else { return Vec::new(); };
             vec![(image.to_rgba8(), Duration::from_secs(1))]
+        } else {
+            let path_buf = PathBuf::from(path);
+            let is_gif = path_buf.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
+            if is_gif {
+                let Ok(file) = fs::File::open(&path_buf) else { return Vec::new(); };
+                let Ok(decoder) = image::codecs::gif::GifDecoder::new(BufReader::new(file)) else { return Vec::new(); };
+                let Ok(frames) = image::AnimationDecoder::into_frames(decoder).collect_frames() else { return Vec::new(); };
+                frames.into_iter().map(|frame| {
+                    let delay = frame.delay().numer_denom_ms();
+                    let ms = delay.0.checked_div(delay.1).unwrap_or(100).max(30);
+                    (frame.into_buffer(), Duration::from_millis(ms as u64))
+                }).collect()
+            } else {
+                let Ok(image) = image::open(&path_buf) else { return Vec::new(); };
+                vec![(image.to_rgba8(), Duration::from_secs(1))]
+            }
         };
         decoded.into_iter().enumerate().map(|(index, (image, delay))| {
             let size = [image.width() as usize, image.height() as usize];
-            let texture = ctx.load_texture(
-                format!("tensura-user-background-{index}"),
-                egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()),
-                egui::TextureOptions::LINEAR,
-            );
+            let texture = ctx.load_texture(format!("tensura-background-{index}"), egui::ColorImage::from_rgba_unmultiplied(size, &image.into_raw()), egui::TextureOptions::LINEAR);
             (texture, delay)
         }).collect()
     }
@@ -809,7 +809,7 @@ impl TensuraApp {
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui|{
                     if ui.button("Choose background image").clicked(){if let Some(path)=rfd::FileDialog::new().add_filter("Images and GIFs",&["png","jpg","jpeg","webp","gif"]).pick_file(){self.settings.background_path=path.display().to_string();self.background_frames=Self::load_background(ctx,&self.settings.background_path);self.background_started=Instant::now();}}
-                    if ui.button("Reset background").clicked(){self.settings.background_path.clear();self.background_frames.clear();}
+                    if ui.button("Reset background").clicked(){self.settings.background_path.clear();self.background_frames=Self::load_background(ctx, "");self.background_started=Instant::now();}
                 });
                 ui.add_space(6.0);
                 ui.horizontal(|ui|{ui.label(RichText::new("Accent colour").color(muted));ui.add(egui::Slider::new(&mut self.settings.accent_hue,0.0..=1.0).show_value(false));});
