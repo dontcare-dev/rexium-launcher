@@ -527,7 +527,7 @@ impl TensuraApp {
                 ui.add_space(18.0);
                 let hero_height = (ui.available_height() * 0.56).clamp(275.0, 390.0);
                 let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
-                egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0, border)).corner_radius(18.0).show(ui, |ui| {
+                ui.allocate_ui_at_rect(hero, |ui| { egui::Frame::new().fill(Color32::from_rgb(17, 35, 71)).stroke(egui::Stroke::new(1.0, border)).corner_radius(18.0).show(ui, |ui| {
                     ui.set_min_size(hero.size());
                     let rect = ui.min_rect();
                     if !self.background_frames.is_empty() {
@@ -549,7 +549,7 @@ impl TensuraApp {
                     if ui.interact(play, ui.id().with("tensura_play"), egui::Sense::click()).clicked() && !self.busy && !self.game_running {
                         if self.installed { self.start_game(); } else { self.start_install(); }
                     }
-                });
+                }); });
                 ui.add_space(16.0);
                 ui.label(RichText::new("QUICK ACCESS").size(10.0).strong().color(muted));
                 ui.add_space(8.0);
