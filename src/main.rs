@@ -118,11 +118,11 @@ impl TensuraApp {
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
-        style.visuals.window_fill = Color32::from_rgb(8, 14, 25);
+        style.visuals.window_fill = Color32::from_rgb(7, 13, 30);
         style.visuals.panel_fill = Color32::from_rgb(8, 14, 25);
-        style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(20, 33, 48);
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(28, 68, 68);
-        style.visuals.widgets.active.bg_fill = Color32::from_rgb(36, 112, 96);
+        style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(28, 48, 83, 220);
+        style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(39, 83, 113, 235);
+        style.visuals.widgets.active.bg_fill = Color32::from_rgb(48, 226, 177);
         style.spacing.item_spacing = Vec2::new(10.0, 10.0);
         cc.egui_ctx.set_style(style);
         let settings = Self::load_settings();
@@ -451,9 +451,9 @@ impl TensuraApp {
 
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tensura_sidebar")
-            .exact_width(88.0)
+            .exact_width(104.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 31)).inner_margin(egui::Margin::symmetric(17, 16)))
+            .frame(egui::Frame::new().fill(Color32::from_rgb(7, 13, 31)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(110, 157, 255, 42))).inner_margin(egui::Margin::symmetric(24, 16)))
             .show(ctx, |ui| {
                 let mark = egui::Image::from_bytes("bytes://tensura-mark.svg", include_bytes!("../assets/tensura-mark.svg"));
                 ui.add_sized(Vec2::splat(44.0), mark);
@@ -467,7 +467,7 @@ impl TensuraApp {
                         Page::Shaderpacks => include_bytes!("../assets/nav-shaders.svg"),
                         Page::Settings => include_bytes!("../assets/nav-settings.svg"),
                     };
-                    let (rect, response) = ui.allocate_exact_size(Vec2::new(54.0, 72.0), egui::Sense::click());
+                    let (rect, response) = ui.allocate_exact_size(Vec2::new(68.0, 74.0), egui::Sense::click());
                     if response.clicked() {
                         self.page = page;
                         self.results.clear();
@@ -478,7 +478,7 @@ impl TensuraApp {
                             egui::Stroke::new(3.5_f32, Color32::from_rgb(70, 239, 195)),
                         );
                     }
-                    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 9.0), Vec2::splat(32.0));
+                    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.center().y - 9.0), Vec2::splat(34.0));
                     ui.put(icon_rect, egui::Image::from_bytes(
                         format!("bytes://nav-{}.svg", page.label()),
                         icon_bytes,
@@ -670,9 +670,9 @@ impl TensuraApp {
 
     fn browser(&mut self, ui: &mut egui::Ui) {
         let accent=self.accent();
-        let muted=Color32::from_rgb(142,160,177);
-        let panel=Color32::from_rgb(13,22,35);
-        let line=Color32::from_rgb(31,48,67);
+        let muted=Color32::from_rgb(157,177,208);
+        let panel=Color32::from_rgba_unmultiplied(16,29,59,218);
+        let line=Color32::from_rgba_unmultiplied(116,158,255,58);
         let title=match self.page{Page::Mods=>"Mods",Page::ResourcePacks=>"Resource packs",_=>"Shaders"};
         let folder=match self.page{Page::Mods=>"mods",Page::ResourcePacks=>"resourcepacks",Page::Shaderpacks=>"shaderpacks",_=>return};
         let directory=self.current_game_dir().join(folder);
@@ -702,7 +702,7 @@ impl TensuraApp {
                 let mut remove=None;
                 egui::ScrollArea::vertical().show(ui,|ui|{
                     for path in &files {
-                        egui::Frame::new().fill(Color32::from_rgb(17,29,44)).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
+                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(21,37,72,225)).stroke(egui::Stroke::new(1.0_f32, line)).corner_radius(10.0).inner_margin(12.0).show(ui,|ui|{
                             ui.horizontal(|ui|{
                                 ui.label(RichText::new(match folder{"mods"=>"◈","resourcepacks"=>"▧",_=>"✧"}).size(25.0).color(accent));
                                 ui.vertical(|ui|{
@@ -755,7 +755,7 @@ impl TensuraApp {
     }
 
     fn settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let accent=Color32::from_rgb(52,224,183);
+        let accent=self.accent();
         let muted=Color32::from_rgb(142,160,177);
         let panel=Color32::from_rgb(13,22,35);
         let line=Color32::from_rgb(31,48,67);
@@ -850,12 +850,12 @@ impl eframe::App for TensuraApp {
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
         if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
         self.sidebar(ctx);
-        egui::TopBottomPanel::top("topbar").exact_height(64.0)
-            .frame(egui::Frame::new().fill(Color32::from_rgb(8, 15, 34)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(120, 160, 255, 45))).inner_margin(egui::Margin::symmetric(22, 0)))
+        egui::TopBottomPanel::top("topbar").exact_height(72.0)
+            .frame(egui::Frame::new().fill(Color32::from_rgb(8, 15, 34)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(120, 160, 255, 55))).inner_margin(egui::Margin::symmetric(26, 0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.label(RichText::new("◕  TENSURA").size(17.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("LAUNCHER").size(10.0).strong().color(Color32::from_rgb(0, 211, 137)));
+                    ui.label(RichText::new("◕  TENSURA").size(18.0).strong().color(Color32::WHITE));
+                    ui.label(RichText::new("LAUNCHER").size(11.0).strong().color(Color32::from_rgb(0, 211, 137)));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if let Some((version, url)) = self.update_available.clone() {
                             if ui.button(format!("UPDATE {version}")).clicked() { let _ = open::that(url); }
