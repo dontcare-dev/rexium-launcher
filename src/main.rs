@@ -107,8 +107,6 @@ struct TensuraApp {
     game_running: bool,
     new_server_name: String,
     new_server_address: String,
-    new_server_players: String,
-    new_server_capacity: String,
     new_instance_name: String,
     update_available: Option<(String, String)>,
 }
@@ -147,8 +145,6 @@ impl TensuraApp {
             game_running: false,
             new_server_name: String::new(),
             new_server_address: String::new(),
-            new_server_players: "0".to_owned(),
-            new_server_capacity: "20".to_owned(),
             new_instance_name: String::new(),
             update_available: None,
         };
@@ -594,11 +590,8 @@ impl TensuraApp {
                 ui.add(egui::TextEdit::singleline(&mut self.new_server_address).hint_text("Server address").desired_width(f32::INFINITY));
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_players).hint_text("Online").desired_width(62.0));
-                    ui.add(egui::TextEdit::singleline(&mut self.new_server_capacity).hint_text("Slots").desired_width(62.0));
                     if ui.add(egui::Button::new(RichText::new("ADD").size(11.0).strong().color(accent)).frame(false)).clicked() {
                         let name=self.new_server_name.trim().to_owned(); let address=self.new_server_address.trim().to_owned();
-                        let online=self.new_server_players.parse::<u32>().unwrap_or(0); let max=self.new_server_capacity.parse::<u32>().unwrap_or(20).max(1);
                         if !name.is_empty() && !address.is_empty() && !address.contains(' ') {
                             self.settings.servers.push(CustomServer{name,address:address.clone(),players_online:0,players_max:1,online:false});
                             let tx=self.tx.clone(); let query_address=address.clone();
