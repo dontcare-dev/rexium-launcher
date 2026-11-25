@@ -997,7 +997,7 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
             Err(_) => skipped.push(*slug),
         }
     }
-    let shader = download_modrinth_project("complementary-reimagined", "shader", version, loader, &TensuraApp::game_dir());
+    let shader = download_modrinth_project("complementary-reimagined", "shader", version, loader, &game_dir);
     let shader_status = if shader.is_ok() { "Complementary Reimagined installed" } else { "Complementary Reimagined unavailable for this Minecraft version" };
     let report = format!("Tensura Client installed: {}. Performance mods: {} installed, {} unavailable for Minecraft {}. {}. Profile: {}",
         install.version_id, installed.len(), skipped.len(), version, shader_status, instance_dir.display());
