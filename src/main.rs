@@ -526,22 +526,8 @@ impl TensuraApp {
 
         ui.horizontal_top(|ui| {
             ui.allocate_ui_with_layout(Vec2::new(main, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("✦  TENSURA CLIENT").size(10.0).strong().color(accent));
-                        ui.label(RichText::new("Welcome back.").size(23.0).strong().color(white));
-                    });
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let (label, color) = if self.game_running { ("●  IN GAME", accent) } else if self.busy { ("◌  PREPARING", Color32::from_rgb(255, 205, 119)) } else if self.installed { ("●  READY TO PLAY", accent) } else { ("●  SETTING UP", muted) };
-                        egui::Frame::new().fill(Color32::from_rgba_unmultiplied(20, 64, 75, 155)).stroke(egui::Stroke::new(1.0_f32, edge))
-                            .corner_radius(18.0).inner_margin(egui::Margin::symmetric(12, 7)).show(ui, |ui| {
-                                ui.label(RichText::new(label).size(10.0).strong().color(color));
-                            });
-                    });
-                });
-                ui.add_space(14.0);
-
-                let hero_height = (ui.available_height() * 0.70).clamp(410.0, 570.0);
+                ui.add_space(3.0);
+                let hero_height = (ui.available_height() * 0.70).clamp(430.0, 590.0);
                 let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(hero), |ui| {
                     egui::Frame::new().fill(Color32::from_rgb(11, 24, 56)).stroke(egui::Stroke::new(1.0_f32, edge))
@@ -560,12 +546,12 @@ impl TensuraApp {
                             painter.text(rect.left_top()+egui::vec2(25.0, 18.0), egui::Align2::LEFT_TOP, "TENSURA CLIENT", egui::FontId::proportional(13.0), white);
                             painter.text(rect.left_top()+egui::vec2(25.0, 40.0), egui::Align2::LEFT_TOP, format!("{}  •  PERFORMANCE PROFILE", self.settings.loader.to_uppercase()), egui::FontId::proportional(9.0), Color32::from_rgb(196, 222, 255));
 
-                            let chip = egui::Rect::from_min_size(rect.left_top()+egui::vec2(24.0, rect.height()-192.0), Vec2::new(212.0, 31.0));
+                            let chip = egui::Rect::from_min_size(rect.left_top()+egui::vec2(24.0, rect.height()-247.0), Vec2::new(212.0, 31.0));
                             painter.rect_filled(chip, 15.0, Color32::from_rgba_unmultiplied(8, 20, 48, 205));
                             painter.rect_stroke(chip, 15.0, egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(185, 216, 255, 68)), egui::StrokeKind::Inside);
                             painter.text(chip.left_center()+egui::vec2(12.0, 0.0), egui::Align2::LEFT_CENTER, format!("⬡  {}     ●  {}", self.settings.instance_name, self.settings.loader.to_uppercase()), egui::FontId::proportional(10.0), white);
-                            painter.text(rect.left_top()+egui::vec2(25.0, rect.height()-151.0), egui::Align2::LEFT_TOP, "Minecraft", egui::FontId::proportional(43.0), white);
-                            painter.text(rect.left_top()+egui::vec2(28.0, rect.height()-105.0), egui::Align2::LEFT_TOP, format!("{}  /  {}", self.settings.minecraft_version, self.settings.loader.to_uppercase()), egui::FontId::proportional(14.0), Color32::from_rgb(218, 233, 255));
+                            painter.text(rect.left_top()+egui::vec2(25.0, rect.height()-204.0), egui::Align2::LEFT_TOP, "Minecraft", egui::FontId::proportional(43.0), white);
+                            painter.text(rect.left_top()+egui::vec2(28.0, rect.height()-154.0), egui::Align2::LEFT_TOP, format!("{}  /  {}", self.settings.minecraft_version, self.settings.loader.to_uppercase()), egui::FontId::proportional(14.0), Color32::from_rgb(218, 233, 255));
                             let play = egui::Rect::from_min_size(rect.left_bottom()-egui::vec2(-25.0, 75.0), Vec2::new(220.0, 58.0));
                             let label = if self.game_running { "MINECRAFT IS RUNNING" } else if self.busy { "PREPARING CLIENT..." } else if self.installed { "▶   PLAY" } else { "INSTALL CLIENT" };
                             painter.rect_filled(play.translate(egui::vec2(0.0, 4.0)), 13.0, Color32::from_rgba_unmultiplied(24, 241, 191, 72));
