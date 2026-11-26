@@ -1,7 +1,7 @@
 [Setup]
 AppId={{A19D4A26-6B0D-4C7A-9B11-000000000001}
 AppName=Tensura Launcher
-AppVersion=0.4.0
+AppVersion=0.4.1
 AppPublisher=Silver Dev Studios
 DefaultDirName={localappdata}\Programs\Tensura Launcher
 DefaultGroupName=Tensura Launcher
