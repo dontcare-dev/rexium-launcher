@@ -42,15 +42,15 @@ impl Page {
 }
 
 fn paint_nav_icon(p:&egui::Painter,c:egui::Pos2,page:Page,color:Color32){
- let s=13.0;let st=egui::Stroke::new(1.9,color);let ln=|a:egui::Pos2,b:egui::Pos2|p.line_segment([a,b],st);
+ let s=13.0_f32;let st=egui::Stroke::new(1.9_f32,color);let ln=|a:egui::Pos2,b:egui::Pos2|p.line_segment([a,b],st);
  match page{
- Page::Home=>{ln(c+egui::vec2(-s,-2.0),c);ln(c,c+egui::vec2(s,-2.0));ln(c+egui::vec2(-8.0,-5.0),c+egui::vec2(-8.0,10.0));ln(c+egui::vec2(8.0,-5.0),c+egui::vec2(8.0,10.0));ln(c+egui::vec2(-8.0,10.0),c+egui::vec2(8.0,10.0));ln(c+egui::vec2(-3.0,10.0),c+egui::vec2(-3.0,2.0));ln(c+egui::vec2(3.0,10.0),c+egui::vec2(3.0,2.0));}
- Page::Mods=>{let t=c+egui::vec2(0.0,-s);let l=c+egui::vec2(-s,-4.0);let r=c+egui::vec2(s,-4.0);let m=c+egui::vec2(0.0,3.0);let bl=c+egui::vec2(-s,5.0);let br=c+egui::vec2(s,5.0);let b=c+egui::vec2(0.0,s);ln(t,l);ln(t,r);ln(l,m);ln(r,m);ln(l,bl);ln(r,br);ln(bl,b);ln(br,b);ln(m,b);}
- Page::ResourcePacks=>{let r=egui::Rect::from_center_size(c,egui::vec2(22.0,26.0));p.rect_stroke(r,3.0,st,egui::StrokeKind::Inside);ln(r.left_top()+egui::vec2(0.0,6.0),r.right_top()+egui::vec2(0.0,6.0));ln(c+egui::vec2(-5.0,-1.0),c+egui::vec2(5.0,-1.0));ln(c+egui::vec2(-5.0,4.0),c+egui::vec2(5.0,4.0));}
- Page::Shaderpacks=>{for(a,b)in[(egui::vec2(0.0,-s),egui::vec2(0.0,-4.0)),(egui::vec2(0.0,4.0),egui::vec2(0.0,s)),(egui::vec2(-s,0.0),egui::vec2(-4.0,0.0)),(egui::vec2(4.0,0.0),egui::vec2(s,0.0)),(egui::vec2(-8.0,-8.0),egui::vec2(-3.0,-3.0)),(egui::vec2(3.0,3.0),egui::vec2(8.0,8.0)),(egui::vec2(8.0,-8.0),egui::vec2(3.0,-3.0)),(egui::vec2(-3.0,3.0),egui::vec2(-8.0,8.0))]{ln(c+a,c+b);}p.circle_filled(c,2.5,color);}
- Page::Settings=>{p.circle_stroke(c,8.0,st);p.circle_filled(c,3.0,color);for i in 0..8{let a=i as f32*std::f32::consts::TAU/8.0;let d=egui::vec2(a.cos(),a.sin());ln(c+d*10.0,c+d*13.0);}}
+ Page::Home=>{ln(c+egui::vec2(-s,-2.0_f32),c);ln(c,c+egui::vec2(s,-2.0_f32));ln(c+egui::vec2(-8.0_f32,-5.0_f32),c+egui::vec2(-8.0_f32,10.0_f32));ln(c+egui::vec2(8.0_f32,-5.0_f32),c+egui::vec2(8.0_f32,10.0_f32));ln(c+egui::vec2(-8.0_f32,10.0_f32),c+egui::vec2(8.0_f32,10.0_f32));ln(c+egui::vec2(-3.0_f32,10.0_f32),c+egui::vec2(-3.0_f32,2.0_f32));ln(c+egui::vec2(3.0_f32,10.0_f32),c+egui::vec2(3.0_f32,2.0_f32));}
+ Page::Mods=>{let t=c+egui::vec2(0.0_f32,-s);let l=c+egui::vec2(-s,-4.0_f32);let r=c+egui::vec2(s,-4.0_f32);let m=c+egui::vec2(0.0_f32,3.0_f32);let bl=c+egui::vec2(-s,5.0_f32);let br=c+egui::vec2(s,5.0_f32);let b=c+egui::vec2(0.0_f32,s);ln(t,l);ln(t,r);ln(l,m);ln(r,m);ln(l,bl);ln(r,br);ln(bl,b);ln(br,b);ln(m,b);}
+ Page::ResourcePacks=>{let r=egui::Rect::from_center_size(c,egui::vec2(22.0_f32,26.0_f32));p.rect_stroke(r,3.0_f32,st,egui::StrokeKind::Inside);ln(r.left_top()+egui::vec2(0.0_f32,6.0_f32),r.right_top()+egui::vec2(0.0_f32,6.0_f32));ln(c+egui::vec2(-5.0_f32,-1.0_f32),c+egui::vec2(5.0_f32,-1.0_f32));ln(c+egui::vec2(-5.0_f32,4.0_f32),c+egui::vec2(5.0_f32,4.0_f32));}
+ Page::Shaderpacks=>{for(a,b)in[(egui::vec2(0.0_f32,-s),egui::vec2(0.0_f32,-4.0_f32)),(egui::vec2(0.0_f32,4.0_f32),egui::vec2(0.0_f32,s)),(egui::vec2(-s,0.0_f32),egui::vec2(-4.0_f32,0.0_f32)),(egui::vec2(4.0_f32,0.0_f32),egui::vec2(s,0.0_f32)),(egui::vec2(-8.0_f32,-8.0_f32),egui::vec2(-3.0_f32,-3.0_f32)),(egui::vec2(3.0_f32,3.0_f32),egui::vec2(8.0_f32,8.0_f32)),(egui::vec2(8.0_f32,-8.0_f32),egui::vec2(3.0_f32,-3.0_f32)),(egui::vec2(-3.0_f32,3.0_f32),egui::vec2(-8.0_f32,8.0_f32))]{ln(c+a,c+b);}p.circle_filled(c,2.5_f32,color);}
+ Page::Settings=>{p.circle_stroke(c,8.0_f32,st);p.circle_filled(c,3.0_f32,color);for i in 0..8{let a=i as f32*std::f32::consts::TAU/8.0_f32;let d=egui::vec2(a.cos(),a.sin());ln(c+d*10.0_f32,c+d*13.0_f32);}}
  }}
-fn paint_cover(p:&egui::Painter,t:&egui::TextureHandle,r:egui::Rect,tint:Color32){let z=t.size_vec2();let q=r.size();let sa=z.x/z.y.max(1.0);let ta=q.x/q.y.max(1.0);let uv=if sa>ta{let v=ta/sa;let m=(1.0-v)*0.5;egui::Rect::from_min_max(egui::pos2(m,0.0),egui::pos2(1.0-m,1.0))}else{let v=sa/ta;let m=(1.0-v)*0.5;egui::Rect::from_min_max(egui::pos2(0.0,m),egui::pos2(1.0,1.0-m))};p.image(t.id(),r,uv,tint);}
+fn paint_cover(p:&egui::Painter,t:&egui::TextureHandle,r:egui::Rect,tint:Color32){let z=t.size_vec2();let q=r.size();let sa=z.x/z.y.max(1.0_f32);let ta=q.x/q.y.max(1.0_f32);let uv=if sa>ta{let v=ta/sa;let m=(1.0_f32-v)*0.5_f32;egui::Rect::from_min_max(egui::pos2(m,0.0_f32),egui::pos2(1.0_f32-m,1.0_f32))}else{let v=sa/ta;let m=(1.0_f32-v)*0.5_f32;egui::Rect::from_min_max(egui::pos2(0.0_f32,m),egui::pos2(1.0_f32,1.0_f32-m))};p.image(t.id(),r,uv,tint);}
 
 #[derive(Clone, Deserialize)]
 struct Project {
@@ -843,7 +843,7 @@ impl eframe::App for TensuraApp {
         self.handle_messages();
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
         if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
-        let viewport=ctx.content_rect();
+        let viewport=ctx.screen_rect();
         if !self.background_frames.is_empty(){let texture=&self.background_frames[self.background_index()].0;let painter=ctx.layer_painter(egui::LayerId::background());paint_cover(&painter,texture,viewport,Color32::WHITE);painter.rect_filled(viewport,0.0,Color32::from_rgba_unmultiplied(4,10,28,74));}
         self.sidebar(ctx);
         egui::TopBottomPanel::top("topbar").exact_height(72.0)
