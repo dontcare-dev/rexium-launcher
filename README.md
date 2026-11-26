@@ -6,12 +6,12 @@ A Windows-first Minecraft Java launcher built with Rust, egui, and mc-launcher-c
 
 - Isolated named instances with their own Minecraft files, saves, mods, resource packs, shader packs, and configuration.
 - Minecraft Java installation with Fabric, Quilt, Forge, and NeoForge profiles.
-- Automatic Java 21 runtime provisioning on Windows when no compatible runtime is available.
+- Bundled Temurin Java 21 runtime included in the Windows installer, ready before the first game launch.
 - Offline profiles for single-player and servers that permit offline-mode connections.
 - Microsoft device-code authentication for accounts that own Minecraft: Java Edition.
 - Modrinth discovery filtered by the selected Minecraft version and mod loader, with project artwork and one-click installation.
 - Installed mod, resource-pack, and shader-pack inventory with file removal and folder shortcuts.
-- Performance mod preset for Fabric and Complementary Reimagined shader installation when compatible.
+- Optional Fabric performance mod preset; shader packs remain opt-in.
 - Server list with live status refresh.
 - Instance selection with isolated saves, mods, resource packs, shader packs, screenshots, and configuration files.
 - Launcher settings for Minecraft version, loader, memory allocation, custom backgrounds including animated GIFs, and accent customization.
@@ -37,6 +37,6 @@ Install the stable Rust toolchain and Inno Setup, then run:
     cargo build --release
     iscc installer/TensuraLauncher.iss
 
-GitHub Actions runs the same checks on Windows and uploads the executable and setup installer as the `TensuraLauncher-Windows` artifact.
+GitHub Actions bundles the Windows Java 21 runtime into the installer. On first launch, the selected Minecraft version, loader, libraries, assets and default Fabric performance mods are prepared before Play becomes available.
 
 Mod and shader downloads use the public Modrinth API. Minecraft files are installed from Mojang and loader metadata services. Tensura Launcher is an independent community project and is not affiliated with Mojang or Microsoft.

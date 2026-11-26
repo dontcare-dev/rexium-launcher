@@ -1,7 +1,7 @@
 [Setup]
 AppId={{A19D4A26-6B0D-4C7A-9B11-000000000001}
 AppName=Tensura Launcher
-AppVersion=0.3.0
+AppVersion=0.4.0
 AppPublisher=Silver Dev Studios
 DefaultDirName={localappdata}\Programs\Tensura Launcher
 DefaultGroupName=Tensura Launcher
@@ -16,6 +16,7 @@ WizardStyle=modern
 
 [Files]
 Source: "..\target\release\tensura-launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\target\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Tensura Launcher"; Filename: "{app}\tensura-launcher.exe"

@@ -29,6 +29,19 @@ jobs:
         run: cargo test --release
       - name: Build Windows executable
         run: cargo build --release
+      - name: Bundle Java 21 runtime
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "temurin-jre.zip"
+          $stage = Join-Path $env:RUNNER_TEMP "temurin-stage"
+          $bundle = "target\runtime"
+          Invoke-WebRequest "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $stage -Force
+          $runtime = Get-ChildItem $stage -Directory | Select-Object -First 1
+          if (-not $runtime) { throw "Temurin Java runtime archive was empty." }
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+          Copy-Item "$($runtime.FullName)\*" $bundle -Recurse -Force
+          if (-not (Test-Path "$bundle\bin\java.exe")) { throw "Bundled Java runtime is missing java.exe." }
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build Windows installer

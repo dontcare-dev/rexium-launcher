@@ -41,15 +41,7 @@ impl Page {
     }
 }
 
-fn paint_nav_icon(p:&egui::Painter,c:egui::Pos2,page:Page,color:Color32){
- let s=13.0_f32;let st=egui::Stroke::new(1.9_f32,color);let ln=|a:egui::Pos2,b:egui::Pos2|p.line_segment([a,b],st);
- match page{
- Page::Home=>{ln(c+egui::vec2(-s,-2.0_f32),c);ln(c,c+egui::vec2(s,-2.0_f32));ln(c+egui::vec2(-8.0_f32,-5.0_f32),c+egui::vec2(-8.0_f32,10.0_f32));ln(c+egui::vec2(8.0_f32,-5.0_f32),c+egui::vec2(8.0_f32,10.0_f32));ln(c+egui::vec2(-8.0_f32,10.0_f32),c+egui::vec2(8.0_f32,10.0_f32));ln(c+egui::vec2(-3.0_f32,10.0_f32),c+egui::vec2(-3.0_f32,2.0_f32));ln(c+egui::vec2(3.0_f32,10.0_f32),c+egui::vec2(3.0_f32,2.0_f32));}
- Page::Mods=>{let t=c+egui::vec2(0.0_f32,-s);let l=c+egui::vec2(-s,-4.0_f32);let r=c+egui::vec2(s,-4.0_f32);let m=c+egui::vec2(0.0_f32,3.0_f32);let bl=c+egui::vec2(-s,5.0_f32);let br=c+egui::vec2(s,5.0_f32);let b=c+egui::vec2(0.0_f32,s);ln(t,l);ln(t,r);ln(l,m);ln(r,m);ln(l,bl);ln(r,br);ln(bl,b);ln(br,b);ln(m,b);}
- Page::ResourcePacks=>{let r=egui::Rect::from_center_size(c,egui::vec2(22.0_f32,26.0_f32));p.rect_stroke(r,3.0_f32,st,egui::StrokeKind::Inside);ln(r.left_top()+egui::vec2(0.0_f32,6.0_f32),r.right_top()+egui::vec2(0.0_f32,6.0_f32));ln(c+egui::vec2(-5.0_f32,-1.0_f32),c+egui::vec2(5.0_f32,-1.0_f32));ln(c+egui::vec2(-5.0_f32,4.0_f32),c+egui::vec2(5.0_f32,4.0_f32));}
- Page::Shaderpacks=>{for(a,b)in[(egui::vec2(0.0_f32,-s),egui::vec2(0.0_f32,-4.0_f32)),(egui::vec2(0.0_f32,4.0_f32),egui::vec2(0.0_f32,s)),(egui::vec2(-s,0.0_f32),egui::vec2(-4.0_f32,0.0_f32)),(egui::vec2(4.0_f32,0.0_f32),egui::vec2(s,0.0_f32)),(egui::vec2(-8.0_f32,-8.0_f32),egui::vec2(-3.0_f32,-3.0_f32)),(egui::vec2(3.0_f32,3.0_f32),egui::vec2(8.0_f32,8.0_f32)),(egui::vec2(8.0_f32,-8.0_f32),egui::vec2(3.0_f32,-3.0_f32)),(egui::vec2(-3.0_f32,3.0_f32),egui::vec2(-8.0_f32,8.0_f32))]{ln(c+a,c+b);}p.circle_filled(c,2.5_f32,color);}
- Page::Settings=>{p.circle_stroke(c,8.0_f32,st);p.circle_filled(c,3.0_f32,color);for i in 0..8{let a=i as f32*std::f32::consts::TAU/8.0_f32;let d=egui::vec2(a.cos(),a.sin());ln(c+d*10.0_f32,c+d*13.0_f32);}}
- }}
+fn svg_icon(ui:&mut egui::Ui,name:&'static str,size:f32,color:Color32){let index=match name{"home"=>0,"mods"=>1,"packs"=>2,"shaders"=>3,"settings"=>4,"discord"=>5,"globe"=>6,"refresh"=>7,"server"=>8,"plus"=>9,"user"=>10,"microsoft"=>11,"status"=>12,"folder"=>13,"play"=>14,"search"=>15,"download"=>16,"trash"=>17,"box"=>18,"cpu"=>19,"memory"=>20,"java"=>21,"palette"=>22,"repair"=>23,"logs"=>24,"chevron"=>25,"sparkles"=>26,"check"=>27,"close"=>28,"monitor"=>29,"rocket"=>30,"shield"=>31,_=>0};let u0=index as f32/32.0;let u1=(index+1) as f32/32.0;let uv=egui::Rect::from_min_max(egui::pos2(u0,0.0),egui::pos2(u1,1.0));ui.add(egui::Image::from_bytes("bytes://tensura-icons",include_bytes!("../assets/tensura-icons.svg")).uv(uv).fit_to_exact_size(Vec2::splat(size)).tint(color));}
 fn paint_cover(p:&egui::Painter,t:&egui::TextureHandle,r:egui::Rect,tint:Color32){let z=t.size_vec2();let q=r.size();let sa=z.x/z.y.max(1.0_f32);let ta=q.x/q.y.max(1.0_f32);let uv=if sa>ta{let v=ta/sa;let m=(1.0_f32-v)*0.5_f32;egui::Rect::from_min_max(egui::pos2(m,0.0_f32),egui::pos2(1.0_f32-m,1.0_f32))}else{let v=sa/ta;let m=(1.0_f32-v)*0.5_f32;egui::Rect::from_min_max(egui::pos2(0.0_f32,m),egui::pos2(1.0_f32,1.0_f32-m))};p.image(t.id(),r,uv,tint);}
 
 #[derive(Clone, Deserialize)]
@@ -484,7 +476,10 @@ impl TensuraApp {
                         ui.painter().line_segment([rect.left_top()+egui::vec2(1.0,13.0),rect.left_bottom()-egui::vec2(-1.0,13.0)],egui::Stroke::new(2.5_f32,Color32::from_rgb(91,242,221)));
                     }
                     let icon_color=if selected{Color32::from_rgb(120,250,230)}else{Color32::from_rgb(178,201,236)};
-                    paint_nav_icon(ui.painter(),egui::pos2(rect.center().x,rect.center().y-9.0),page,icon_color);
+                    let icon_name=match page{Page::Home=>"home",Page::Mods=>"mods",Page::ResourcePacks=>"packs",Page::Shaderpacks=>"shaders",Page::Settings=>"settings"};
+                    let icon_rect=egui::Rect::from_center_size(egui::pos2(rect.center().x,rect.center().y-9.0),Vec2::splat(29.0));
+                    let uv=egui::Rect::from_min_max(egui::pos2(match icon_name{"home"=>0.0,"mods"=>1.0,"packs"=>2.0,"shaders"=>3.0,_=>4.0}/32.0,0.0),egui::pos2((match icon_name{"home"=>1.0,"mods"=>2.0,"packs"=>3.0,"shaders"=>4.0,_=>5.0})/32.0,1.0));
+                    ui.put(icon_rect,egui::Image::from_bytes("bytes://tensura-icons",include_bytes!("../assets/tensura-icons.svg")).uv(uv).fit_to_exact_size(icon_rect.size()).tint(icon_color));
                     ui.painter().text(
                         egui::pos2(rect.center().x, rect.bottom() - 8.0),
                         egui::Align2::CENTER_CENTER,
@@ -505,8 +500,8 @@ impl TensuraApp {
         let accent = self.accent();
         let white = Color32::from_rgb(235, 243, 255);
         let muted = Color32::from_rgb(154, 174, 208);
-        let glass = Color32::from_rgba_unmultiplied(15, 31, 67, 154);
-        let edge = Color32::from_rgba_unmultiplied(139, 190, 255, 112);
+        let glass = Color32::from_rgba_unmultiplied(13, 31, 68, 112);
+        let edge = Color32::from_rgba_unmultiplied(169, 209, 255, 132);
         let width = ui.available_width();
         let rail = (width * 0.285).clamp(285.0, 385.0);
         let gap = 16.0;
@@ -534,19 +529,13 @@ impl TensuraApp {
                 let hero_height = (ui.available_height() * 0.70).clamp(430.0, 590.0);
                 let (hero, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), hero_height), egui::Sense::hover());
                 ui.scope_builder(egui::UiBuilder::new().max_rect(hero), |ui| {
-                    egui::Frame::new().fill(Color32::from_rgb(11, 24, 56)).stroke(egui::Stroke::new(1.0_f32, edge))
+                    egui::Frame::new().fill(Color32::from_rgba_unmultiplied(12,29,66,112)).stroke(egui::Stroke::new(1.0_f32, edge))
                         .corner_radius(17.0).show(ui, |ui| {
                             ui.set_min_size(hero.size());
                             let rect = ui.min_rect();
-                            if !self.background_frames.is_empty() {
-                                let texture = &self.background_frames[self.background_index()].0;
-                                paint_cover(ui.painter(),texture,rect,Color32::WHITE);
-                            } else {
-                                ui.put(rect, egui::Image::from_bytes("bytes://tensura-hero-reference", include_bytes!("../assets/tensura-hero.jpg")).fit_to_exact_size(rect.size()));
-                            }
                             let painter = ui.painter().with_clip_rect(rect);
-                            painter.rect_filled(rect,17.0,Color32::from_black_alpha(16));
-                            painter.rect_filled(egui::Rect::from_min_max(rect.left_top(),egui::pos2(rect.right(),rect.top()+72.0)),17.0,Color32::from_rgba_unmultiplied(7,17,42,48));
+                            painter.rect_filled(rect,17.0,Color32::from_rgba_unmultiplied(9,24,55,35));
+                            painter.rect_filled(egui::Rect::from_min_max(rect.left_top(),egui::pos2(rect.right(),rect.top()+72.0)),17.0,Color32::from_rgba_unmultiplied(7,17,42,24));
                             painter.rect_stroke(rect.shrink(1.0),16.0,egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(225,245,255,90)),egui::StrokeKind::Inside);
                             painter.text(rect.left_top()+egui::vec2(25.0, 18.0), egui::Align2::LEFT_TOP, "TENSURA CLIENT", egui::FontId::proportional(13.0), white);
                             painter.text(rect.left_top()+egui::vec2(25.0, 40.0), egui::Align2::LEFT_TOP, format!("{}  •  PERFORMANCE PROFILE", self.settings.loader.to_uppercase()), egui::FontId::proportional(9.0), Color32::from_rgb(196, 222, 255));
@@ -569,7 +558,7 @@ impl TensuraApp {
                 });
 
                 ui.add_space(9.0);
-                egui::Frame::new().fill(Color32::from_rgba_unmultiplied(19, 36, 75, 226)).stroke(egui::Stroke::new(1.0_f32, edge))
+                egui::Frame::new().fill(Color32::from_rgba_unmultiplied(15, 37, 77, 152)).stroke(egui::Stroke::new(1.0_f32, edge))
                     .corner_radius(11.0).inner_margin(egui::Margin::symmetric(8, 7)).show(ui, |ui| {
                         ui.horizontal(|ui| {
                             for (name, page, glyph) in [
@@ -844,10 +833,10 @@ impl eframe::App for TensuraApp {
         if self.busy { ctx.request_repaint_after(Duration::from_millis(120)); }
         if self.background_frames.len() > 1 { ctx.request_repaint_after(self.background_frames[self.background_index()].1); }
         let viewport=ctx.screen_rect();
-        if !self.background_frames.is_empty(){let texture=&self.background_frames[self.background_index()].0;let painter=ctx.layer_painter(egui::LayerId::background());paint_cover(&painter,texture,viewport,Color32::WHITE);painter.rect_filled(viewport,0.0,Color32::from_rgba_unmultiplied(4,10,28,74));}
+        if !self.background_frames.is_empty(){let texture=&self.background_frames[self.background_index()].0;let painter=ctx.layer_painter(egui::LayerId::background());paint_cover(&painter,texture,viewport,Color32::WHITE);painter.rect_filled(viewport,0.0,Color32::from_rgba_unmultiplied(4,10,28,18));}
         self.sidebar(ctx);
         egui::TopBottomPanel::top("topbar").exact_height(72.0)
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(8,15,34,150)).stroke(egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(164,203,255,95))).inner_margin(egui::Margin::symmetric(26,0)))
+            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(8,19,43,112)).stroke(egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(190,220,255,110))).inner_margin(egui::Margin::symmetric(26,0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.add(egui::Image::new(&self.mascot_texture).fit_to_exact_size(Vec2::splat(42.0)));
@@ -870,7 +859,7 @@ impl eframe::App for TensuraApp {
                     });
                 });
             });
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(7,12,29,82)).inner_margin(22.0)).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(7,12,29,28)).inner_margin(22.0)).show(ctx, |ui| {
             match self.page {
                 Page::Home => self.home(ui),
                 Page::Mods | Page::ResourcePacks | Page::Shaderpacks => self.browser(ui),
@@ -994,6 +983,7 @@ fn find_java() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let candidates = [
+            std::env::current_exe().ok().and_then(|p|p.parent().map(|d|d.join("runtime").join("bin").join("java.exe"))).unwrap_or_default(),
             TensuraApp::data_dir().join("runtime").join("bin").join("java.exe"),
             PathBuf::from(r"C:\Program Files\Eclipse Adoptium\jdk-21\bin\java.exe"),
             PathBuf::from(r"C:\Program Files\Java\jdk-21\bin\java.exe"),
@@ -1038,7 +1028,10 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
     for folder in ["mods", "resourcepacks", "shaderpacks", "screenshots", "saves", "config"] {
         fs::create_dir_all(game_dir.join(folder)).map_err(|e| e.to_string())?;
     }
-    let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {version} + {loader}...")));
+    let _ = tx.send(WorkerMessage::Status("Preparing Java 21 runtime before game files...".to_owned()));
+    let java=ensure_java()?;
+    if let Some(parent)=java.parent(){let mut paths=vec![parent.to_path_buf()];paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));if let Ok(path)=std::env::join_paths(paths){std::env::set_var("PATH",path);}}
+    let _ = tx.send(WorkerMessage::Status(format!("Installing Minecraft {version} + {loader} and preloading libraries...")));
     let launcher = Launcher::new(minecraft_dir);
     let loader_spec = match loader {
         "fabric" => Some(LoaderSpec::Fabric { version: LoaderVersion::LatestStable }),
@@ -1047,14 +1040,6 @@ fn install_tensura(version: &str, loader: &str, instance_dir: &Path, tx: &Sender
         "neoforge" => Some(LoaderSpec::NeoForge { version: LoaderVersion::Latest }),
         _ => return Err(format!("Unsupported mod loader: {loader}")),
     };
-    if matches!(loader, "forge" | "neoforge") {
-        let java = ensure_java()?;
-        if let Some(parent) = java.parent() {
-            let mut paths = vec![parent.to_path_buf()];
-            paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
-            if let Ok(path) = std::env::join_paths(paths) { std::env::set_var("PATH", path); }
-        }
-    }
     let install_request = InstallRequest {
         minecraft_version: version.to_owned(),
         loader: loader_spec,
