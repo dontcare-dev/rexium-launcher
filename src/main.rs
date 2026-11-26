@@ -467,7 +467,7 @@ impl TensuraApp {
 
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tensura_sidebar").exact_width(104.0).resizable(false)
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(7,13,31,142)).stroke(egui::Stroke::new(1.0,Color32::from_rgba_unmultiplied(155,196,255,88))).inner_margin(egui::Margin::symmetric(14,16)))
+            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(7,13,31,142)).stroke(egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(155,196,255,88))).inner_margin(egui::Margin::symmetric(14,16)))
             .show(ctx, |ui| {
                 ui.add(egui::Image::new(&self.mascot_texture).fit_to_exact_size(Vec2::splat(48.0)));
                 ui.add_space(34.0);
@@ -480,8 +480,8 @@ impl TensuraApp {
                     }
                     if selected {
                         ui.painter().rect_filled(rect.shrink2(egui::vec2(2.0,1.0)),11.0,Color32::from_rgba_unmultiplied(44,191,185,38));
-                        ui.painter().rect_stroke(rect.shrink2(egui::vec2(2.0,1.0)),11.0,egui::Stroke::new(1.0,Color32::from_rgba_unmultiplied(108,246,226,105)),egui::StrokeKind::Inside);
-                        ui.painter().line_segment([rect.left_top()+egui::vec2(1.0,13.0),rect.left_bottom()-egui::vec2(-1.0,13.0)],egui::Stroke::new(2.5,Color32::from_rgb(91,242,221)));
+                        ui.painter().rect_stroke(rect.shrink2(egui::vec2(2.0,1.0)),11.0,egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(108,246,226,105)),egui::StrokeKind::Inside);
+                        ui.painter().line_segment([rect.left_top()+egui::vec2(1.0,13.0),rect.left_bottom()-egui::vec2(-1.0,13.0)],egui::Stroke::new(2.5_f32,Color32::from_rgb(91,242,221)));
                     }
                     let icon_color=if selected{Color32::from_rgb(120,250,230)}else{Color32::from_rgb(178,201,236)};
                     paint_nav_icon(ui.painter(),egui::pos2(rect.center().x,rect.center().y-9.0),page,icon_color);
@@ -516,7 +516,7 @@ impl TensuraApp {
             egui::Frame::new().fill(glass).stroke(egui::Stroke::new(1.0_f32, edge))
                 .corner_radius(14.0).inner_margin(egui::Margin::symmetric(13, 12)).show(ui, |ui| {
                     let card_rect=ui.max_rect();
-                    ui.painter().line_segment([card_rect.left_top()+egui::vec2(13.0,1.0),card_rect.right_top()+egui::vec2(-13.0,1.0)],egui::Stroke::new(1.0,Color32::from_rgba_unmultiplied(225,242,255,92)));
+                    ui.painter().line_segment([card_rect.left_top()+egui::vec2(13.0,1.0),card_rect.right_top()+egui::vec2(-13.0,1.0)],egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(225,242,255,92)));
                     ui.horizontal(|ui| {
                         let x = ui.min_rect().left();
                         ui.painter().line_segment([egui::pos2(x, ui.cursor().top()+2.0), egui::pos2(x, ui.cursor().top()+17.0)], egui::Stroke::new(3.0_f32, accent));
@@ -547,7 +547,7 @@ impl TensuraApp {
                             let painter = ui.painter().with_clip_rect(rect);
                             painter.rect_filled(rect,17.0,Color32::from_black_alpha(16));
                             painter.rect_filled(egui::Rect::from_min_max(rect.left_top(),egui::pos2(rect.right(),rect.top()+72.0)),17.0,Color32::from_rgba_unmultiplied(7,17,42,48));
-                            painter.rect_stroke(rect.shrink(1.0),16.0,egui::Stroke::new(1.0,Color32::from_rgba_unmultiplied(225,245,255,90)),egui::StrokeKind::Inside);
+                            painter.rect_stroke(rect.shrink(1.0),16.0,egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(225,245,255,90)),egui::StrokeKind::Inside);
                             painter.text(rect.left_top()+egui::vec2(25.0, 18.0), egui::Align2::LEFT_TOP, "TENSURA CLIENT", egui::FontId::proportional(13.0), white);
                             painter.text(rect.left_top()+egui::vec2(25.0, 40.0), egui::Align2::LEFT_TOP, format!("{}  •  PERFORMANCE PROFILE", self.settings.loader.to_uppercase()), egui::FontId::proportional(9.0), Color32::from_rgb(196, 222, 255));
 
@@ -847,7 +847,7 @@ impl eframe::App for TensuraApp {
         if !self.background_frames.is_empty(){let texture=&self.background_frames[self.background_index()].0;let painter=ctx.layer_painter(egui::LayerId::background());paint_cover(&painter,texture,viewport,Color32::WHITE);painter.rect_filled(viewport,0.0,Color32::from_rgba_unmultiplied(4,10,28,74));}
         self.sidebar(ctx);
         egui::TopBottomPanel::top("topbar").exact_height(72.0)
-            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(8,15,34,150)).stroke(egui::Stroke::new(1.0,Color32::from_rgba_unmultiplied(164,203,255,95))).inner_margin(egui::Margin::symmetric(26,0)))
+            .frame(egui::Frame::new().fill(Color32::from_rgba_unmultiplied(8,15,34,150)).stroke(egui::Stroke::new(1.0_f32,Color32::from_rgba_unmultiplied(164,203,255,95))).inner_margin(egui::Margin::symmetric(26,0)))
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.add(egui::Image::new(&self.mascot_texture).fit_to_exact_size(Vec2::splat(42.0)));
